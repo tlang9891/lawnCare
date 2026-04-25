@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${inter.className} bg-gray-50`}>
         <AuthProvider>
           <NavBar />
-          <div className="pt-14">{children}</div>
+          <div className="pt-[104px]">{children}</div>
         </AuthProvider>
       </body>
     </html>
