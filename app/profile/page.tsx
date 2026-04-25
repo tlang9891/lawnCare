@@ -122,18 +122,35 @@ export default function ProfilePage() {
     setAvatarDataUrl(user.avatarDataUrl ?? null)
   }, [user])
 
-  // Geocode ZIP → city/state/lat
+  // Geocode ZIP/postal → city/state/lat
   const geocodeZip = useCallback(async (zip: string) => {
-    if (zip.length < 5) return
+    if (zip.length < 3) return
     setGeoLoading(true)
     try {
-      const res  = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(zip)}&count=1&language=en&format=json`)
-      const data = await res.json()
-      const r    = data.results?.[0]
-      if (r) {
-        setCity(r.name ?? '')
-        setState(r.admin1 ?? '')
-        setLat(r.latitude)
+      const isCA = /^[A-Za-z]\d[A-Za-z]/i.test(zip.trim())
+      if (isCA) {
+        const code = zip.replace(/\s+/g, '').toUpperCase()
+        const res  = await fetch(
+          `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(code)}&countrycodes=ca&format=json&addressdetails=1&limit=1`,
+          { headers: { 'Accept-Language': 'en' } }
+        )
+        const data = await res.json()
+        if (data.length) {
+          const { lat, address } = data[0]
+          setCity(address?.city || address?.town || address?.village || address?.county || '')
+          setState(address?.state || '')
+          setLat(parseFloat(lat))
+        }
+      } else {
+        if (zip.length < 5) { setGeoLoading(false); return }
+        const res  = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(zip)}&count=1&language=en&format=json`)
+        const data = await res.json()
+        const r    = data.results?.[0]
+        if (r) {
+          setCity(r.name ?? '')
+          setState(r.admin1 ?? '')
+          setLat(r.latitude)
+        }
       }
     } catch { /* silent */ }
     setGeoLoading(false)

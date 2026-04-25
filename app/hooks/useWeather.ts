@@ -30,7 +30,7 @@ export interface UseWeatherResult {
 
 const cache = new Map<string, WeatherData>()
 
-// ── Geocoding API response shape ──────────────────────────────────────────────
+// ── Geocoding helpers ─────────────────────────────────────────────────────────
 
 interface GeoResult {
   latitude: number
@@ -41,6 +41,43 @@ interface GeoResult {
 
 interface GeoResponse {
   results?: GeoResult[]
+}
+
+function isCanadianPostal(code: string): boolean {
+  return /^[A-Za-z]\d[A-Za-z]/i.test(code.trim())
+}
+
+interface GeoPoint { lat: number; lng: number; locationName: string }
+
+async function geocodeUS(zip: string): Promise<GeoPoint | null> {
+  const url =
+    `https://geocoding-api.open-meteo.com/v1/search` +
+    `?name=${encodeURIComponent(zip)}&count=1&language=en&format=json`
+  const res = await fetch(url)
+  if (!res.ok) return null
+  const json: GeoResponse = await res.json()
+  if (!json.results?.length) return null
+  const { latitude, longitude, name, admin1 } = json.results[0]
+  return { lat: latitude, lng: longitude, locationName: admin1 ? `${name}, ${admin1}` : name }
+}
+
+async function geocodeCA(postal: string): Promise<GeoPoint | null> {
+  const code = postal.replace(/\s+/g, '').toUpperCase()
+  const url =
+    `https://nominatim.openstreetmap.org/search` +
+    `?postalcode=${encodeURIComponent(code)}&countrycodes=ca&format=json&addressdetails=1&limit=1`
+  const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
+  if (!res.ok) return null
+  const json = await res.json()
+  if (!json.length) return null
+  const { lat, lon, address } = json[0]
+  const city = address?.city || address?.town || address?.village || address?.county || ''
+  const province = address?.state || ''
+  return {
+    lat: parseFloat(lat),
+    lng: parseFloat(lon),
+    locationName: city && province ? `${city}, ${province}` : city || province || postal,
+  }
 }
 
 // ── Weather API response shape ────────────────────────────────────────────────
@@ -92,17 +129,12 @@ export function useWeather(zipCode: string | null | undefined): UseWeatherResult
       setData(null)
 
       try {
-        // Step 1: Geocoding — zip code → lat/lng + city name
-        const geoUrl =
-          `https://geocoding-api.open-meteo.com/v1/search` +
-          `?name=${encodeURIComponent(zipCode!)}&count=1&language=en&format=json`
+        // Step 1: Geocoding — postal/zip → lat/lng + city name
+        const geo = isCanadianPostal(zipCode!)
+          ? await geocodeCA(zipCode!)
+          : await geocodeUS(zipCode!)
 
-        const geoRes = await fetch(geoUrl)
-        if (!geoRes.ok) throw new Error(`Geocoding request failed (${geoRes.status})`)
-
-        const geoJson: GeoResponse = await geoRes.json()
-
-        if (!geoJson.results || geoJson.results.length === 0) {
+        if (!geo) {
           if (!cancelled) {
             setError('Location not found')
             setLoading(false)
@@ -110,8 +142,7 @@ export function useWeather(zipCode: string | null | undefined): UseWeatherResult
           return
         }
 
-        const { latitude, longitude, name, admin1 } = geoJson.results[0]
-        const locationName = admin1 ? `${name}, ${admin1}` : name
+        const { lat: latitude, lng: longitude, locationName } = geo
 
         // Step 2: Weather forecast — lat/lng → 7-day forecast + current conditions
         const weatherUrl =
