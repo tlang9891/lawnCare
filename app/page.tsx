@@ -1216,7 +1216,7 @@ export default function Dashboard() {
         <div className="mt-10">
           <div className="flex items-end justify-between mb-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">The Shed</h2>
+              <h2 className="text-xl font-bold text-gray-900">Your Shed</h2>
               <p className="text-sm text-gray-400 mt-0.5">Equipment &amp; maintenance schedule</p>
             </div>
             <button
