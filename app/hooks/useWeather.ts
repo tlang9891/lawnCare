@@ -13,7 +13,8 @@ export interface DayForecast {
 
 export interface WeatherData {
   locationName: string      // "Austin, TX"
-  currentTempF: number
+  currentTemp: number
+  unit: 'F' | 'C'
   currentWeatherCode: number
   forecast: DayForecast[]  // 7 days, today first
 }
@@ -143,6 +144,8 @@ export function useWeather(zipCode: string | null | undefined): UseWeatherResult
         }
 
         const { lat: latitude, lng: longitude, locationName } = geo
+        const isCA    = isCanadianPostal(zipCode!)
+        const unit: 'F' | 'C' = isCA ? 'C' : 'F'
 
         // Step 2: Weather forecast — lat/lng → 7-day forecast + current conditions
         const weatherUrl =
@@ -150,7 +153,7 @@ export function useWeather(zipCode: string | null | undefined): UseWeatherResult
           `?latitude=${latitude}&longitude=${longitude}` +
           `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weathercode` +
           `&current_weather=true` +
-          `&temperature_unit=fahrenheit` +
+          `&temperature_unit=${isCA ? 'celsius' : 'fahrenheit'}` +
           `&precipitation_unit=inch` +
           `&timezone=auto` +
           `&forecast_days=7`
@@ -173,7 +176,8 @@ export function useWeather(zipCode: string | null | undefined): UseWeatherResult
 
         const result: WeatherData = {
           locationName,
-          currentTempF:      Math.round(current_weather.temperature),
+          currentTemp:        Math.round(current_weather.temperature),
+          unit,
           currentWeatherCode: current_weather.weathercode,
           forecast,
         }

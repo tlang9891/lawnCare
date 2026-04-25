@@ -110,7 +110,7 @@ export default function WeatherWidget({ zipCode }: WeatherWidgetProps) {
         {/* Temp + description */}
         <div className="flex-1 min-w-0">
           <p className="text-4xl font-black text-gray-900 leading-none">
-            {data.currentTempF}&deg;F
+            {data.currentTemp}&deg;{data.unit}
           </p>
           <p className="text-sm text-gray-400 mt-1">{currentInfo.description}</p>
         </div>
@@ -133,7 +133,7 @@ export default function WeatherWidget({ zipCode }: WeatherWidgetProps) {
               <p className="text-xs font-semibold text-gray-500">{getDayLabel(day.date, i)}</p>
               <span className="text-2xl leading-none" aria-hidden>{info.emoji}</span>
               <p className="text-xs font-bold text-gray-800">
-                {day.tempHigh}&deg; / {day.tempLow}&deg;
+                {day.tempHigh}&deg; / {day.tempLow}&deg;{data.unit}
               </p>
               {day.precipProbability > 0 ? (
                 <p className="text-xs text-sky-600 font-medium">{day.precipProbability}% rain</p>
