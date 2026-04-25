@@ -178,56 +178,12 @@ function getMaintenanceNextDate(item: MaintenanceItem): string | null {
 // ── Default data ──────────────────────────────────────────────────────────────
 
 const DEFAULT_LAWN: LawnData = {
-  watering: {
-    logs: [
-      { date: '2026-04-22', duration: 45 },
-      { date: '2026-04-19', duration: 30 },
-      { date: '2026-04-16', duration: 45 },
-      { date: '2026-04-13', duration: 60 },
-      { date: '2026-04-10', duration: 45 },
-    ],
-    nextRecommended: '2026-04-25',
-    intervalDays: 3,
-  },
-  mowing: {
-    logs: [
-      { date: '2026-04-18' },
-      { date: '2026-04-08' },
-      { date: '2026-03-29' },
-      { date: '2026-03-19' },
-    ],
-    nextRecommended: '2026-04-28',
-    intervalDays: 10,
-  },
-  fertilizing: {
-    logs: [
-      { date: '2026-03-15' },
-      { date: '2026-01-15' },
-      { date: '2025-11-15' },
-    ],
-    nextRecommended: '2026-05-15',
-    intervalDays: 60,
-  },
+  watering:    { logs: [], nextRecommended: null, intervalDays: 3  },
+  mowing:      { logs: [], nextRecommended: null, intervalDays: 10 },
+  fertilizing: { logs: [], nextRecommended: null, intervalDays: 60 },
 }
 
-const DEFAULT_EQUIPMENT: Equipment[] = [
-  {
-    id: '1',
-    type: 'mower',
-    year: '2022',
-    make: 'John Deere',
-    model: 'X350',
-    purchaseDate: '2022-04-10',
-    purchaseLocation: 'John Deere Dealer',
-    receiptDataUrl: null,
-    maintenance: [
-      { id: 'm1', name: 'Oil Change',       logDates: ['2026-01-15', '2025-07-10', '2025-01-08'],               intervalMonths: 6  },
-      { id: 'm2', name: 'Blade Sharpening', logDates: ['2026-03-01', '2026-01-01', '2025-11-01', '2025-09-01'], intervalMonths: 2  },
-      { id: 'm3', name: 'Air Filter',       logDates: ['2025-10-01', '2024-10-01'],                              intervalMonths: 12 },
-      { id: 'm4', name: 'Spark Plug',       logDates: ['2024-04-01'],                                            intervalMonths: 24 },
-    ],
-  },
-]
+const DEFAULT_EQUIPMENT: Equipment[] = []
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 
@@ -876,23 +832,29 @@ export default function Dashboard() {
     }
   }, [user, authLoading, router])
 
+  const lawnKey  = user ? `lawncare-lawn-v2-${user.id}`  : null
+  const equipKey = user ? `lawncare-equipment-v2-${user.id}` : null
+
   useEffect(() => {
+    if (!lawnKey || !equipKey) return
     try {
-      const savedLawn  = localStorage.getItem('lawncare-lawn-v2')
-      const savedEquip = localStorage.getItem('lawncare-equipment-v2')
+      const savedLawn  = localStorage.getItem(lawnKey)
+      const savedEquip = localStorage.getItem(equipKey)
       if (savedLawn)  setLawnData(JSON.parse(savedLawn))
+      else            setLawnData(DEFAULT_LAWN)
       if (savedEquip) setEquipment(JSON.parse(savedEquip))
+      else            setEquipment(DEFAULT_EQUIPMENT)
     } catch { /* ignore */ }
     setHydrated(true)
-  }, [])
+  }, [lawnKey, equipKey])
 
   useEffect(() => {
-    if (hydrated) localStorage.setItem('lawncare-lawn-v2', JSON.stringify(lawnData))
-  }, [lawnData, hydrated])
+    if (hydrated && lawnKey)  localStorage.setItem(lawnKey,  JSON.stringify(lawnData))
+  }, [lawnData, hydrated, lawnKey])
 
   useEffect(() => {
-    if (hydrated) localStorage.setItem('lawncare-equipment-v2', JSON.stringify(equipment))
-  }, [equipment, hydrated])
+    if (hydrated && equipKey) localStorage.setItem(equipKey, JSON.stringify(equipment))
+  }, [equipment, hydrated, equipKey])
 
   function openActivityModal(type: ActivityType) {
     setLogDate(todayStr())
