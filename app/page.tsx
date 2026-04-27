@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from './context/AuthContext'
 import WeatherWidget from './components/WeatherWidget'
 import LawnCalendar from './components/LawnCalendar'
+import LawnPhotoGallery, { LawnPhoto } from './components/LawnPhotoGallery'
 
 type ActivityType  = 'watering' | 'mowing' | 'fertilizing'
 type Status        = 'on_track' | 'due_soon' | 'overdue' | 'never'
@@ -1325,12 +1326,14 @@ export default function Dashboard() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
 
-  const [lawnData, setLawnData]           = useState<LawnData>(DEFAULT_LAWN)
-  const [equipment, setEquipment]         = useState<Equipment[]>(DEFAULT_EQUIPMENT)
+  const [lawnData, setLawnData]             = useState<LawnData>(DEFAULT_LAWN)
+  const [equipment, setEquipment]           = useState<Equipment[]>(DEFAULT_EQUIPMENT)
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([])
-  const [hydrated, setHydrated]           = useState(false)
-  const [showAddEquip, setShowAddEquip]   = useState(false)
-  const [editEquip, setEditEquip]         = useState<Equipment | null>(null)
+  const [photos, setPhotos]                 = useState<LawnPhoto[]>([])
+  const [hydrated, setHydrated]             = useState(false)
+  const [activeTab, setActiveTab]           = useState<'dashboard' | 'photos'>('dashboard')
+  const [showAddEquip, setShowAddEquip]     = useState(false)
+  const [editEquip, setEditEquip]           = useState<Equipment | null>(null)
 
   const [tipModal, setTipModal]       = useState<ActivityType | null>(null)
   const [activeModal, setActiveModal] = useState<ActivityType | null>(null)
@@ -1353,22 +1356,26 @@ export default function Dashboard() {
   const lawnKey      = user ? `lawncare-lawn-v2-${user.id}`       : null
   const equipKey     = user ? `lawncare-equipment-v2-${user.id}`  : null
   const scheduleKey  = user ? `lawncare-schedule-v1-${user.id}`   : null
+  const photosKey    = user ? `lawncare-photos-v1-${user.id}`     : null
 
   useEffect(() => {
-    if (!lawnKey || !equipKey || !scheduleKey) return
+    if (!lawnKey || !equipKey || !scheduleKey || !photosKey) return
     try {
       const savedLawn     = localStorage.getItem(lawnKey)
       const savedEquip    = localStorage.getItem(equipKey)
       const savedSchedule = localStorage.getItem(scheduleKey)
+      const savedPhotos   = localStorage.getItem(photosKey)
       if (savedLawn)     setLawnData(JSON.parse(savedLawn))
       else               setLawnData(DEFAULT_LAWN)
       if (savedEquip)    setEquipment(JSON.parse(savedEquip))
       else               setEquipment(DEFAULT_EQUIPMENT)
       if (savedSchedule) setScheduledTasks(JSON.parse(savedSchedule))
       else               setScheduledTasks([])
+      if (savedPhotos)   setPhotos(JSON.parse(savedPhotos))
+      else               setPhotos([])
     } catch { /* ignore */ }
     setHydrated(true)
-  }, [lawnKey, equipKey, scheduleKey])
+  }, [lawnKey, equipKey, scheduleKey, photosKey])
 
   useEffect(() => {
     if (hydrated && lawnKey)     localStorage.setItem(lawnKey,     JSON.stringify(lawnData))
@@ -1381,6 +1388,10 @@ export default function Dashboard() {
   useEffect(() => {
     if (hydrated && scheduleKey) localStorage.setItem(scheduleKey, JSON.stringify(scheduledTasks))
   }, [scheduledTasks, hydrated, scheduleKey])
+
+  useEffect(() => {
+    if (hydrated && photosKey)   localStorage.setItem(photosKey,   JSON.stringify(photos))
+  }, [photos, hydrated, photosKey])
 
   function openActivityModal(type: ActivityType) {
     setLogDate(todayStr())
@@ -1436,6 +1447,14 @@ export default function Dashboard() {
     setScheduledTasks((prev) => prev.filter((t) => t.id !== id))
   }
 
+  function handleAddPhoto(photo: Omit<LawnPhoto, 'id'>) {
+    setPhotos((prev) => [{ ...photo, id: Date.now().toString() }, ...prev])
+  }
+
+  function handleDeletePhoto(id: string) {
+    setPhotos((prev) => prev.filter((p) => p.id !== id))
+  }
+
   function openActivityHistory(type: ActivityType) {
     const labels:  Record<ActivityType, string> = { watering: 'Watering History', mowing: 'Mowing History', fertilizing: 'Fertilizing History' }
     const colors:  Record<ActivityType, string> = { watering: 'bg-blue-500',      mowing: 'bg-green-600',   fertilizing: 'bg-emerald-600'       }
@@ -1486,6 +1505,23 @@ export default function Dashboard() {
         <div className="max-w-3xl mx-auto">
           <p className="text-green-300 text-sm font-medium">{greeting}</p>
           <h1 className="text-white text-2xl font-bold mt-0.5 mb-6">Your Lawn Dashboard</h1>
+
+          {/* Tab nav */}
+          <div className="flex gap-1 bg-white/10 rounded-xl p-1 mb-2">
+            {(['dashboard', 'photos'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  activeTab === tab
+                    ? 'bg-white text-green-800 shadow-sm'
+                    : 'text-white/70 hover:text-white'
+                }`}
+              >
+                {tab === 'dashboard' ? 'Dashboard' : 'Photos'}
+              </button>
+            ))}
+          </div>
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 flex items-center justify-between">
             <div>
               <p className="text-green-200 text-sm">Lawn Health Score</p>
@@ -1518,45 +1554,70 @@ export default function Dashboard() {
         <div className="mt-6">
           <WeatherWidget zipCode={user.zipCode} />
         </div>
-
-        {/* The Shed */}
-        <div className="mt-10">
-          <div className="flex items-end justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Your Shed</h2>
-              <p className="text-sm text-gray-400 mt-0.5">Equipment &amp; maintenance schedule</p>
-            </div>
-            <button
-              onClick={() => setShowAddEquip(true)}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 transition-colors px-3 py-1.5 rounded-lg"
-            >
-              <span className="text-base leading-none">+</span> Add Equipment
-            </button>
+      {/* Dashboard tab */}
+      {activeTab === 'dashboard' && (
+        <div className="max-w-3xl mx-auto px-4 -mt-12">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <CareCard title="Watering"    icon={<WaterIcon />}     activity={lawnData.watering}    accentColor="bg-blue-500"    onLog={() => openActivityModal('watering')}    onHistory={() => openActivityHistory('watering')} />
+            <CareCard title="Mowing"      icon={<MowIcon />}       activity={lawnData.mowing}      accentColor="bg-green-600"   onLog={() => openActivityModal('mowing')}      onHistory={() => openActivityHistory('mowing')} />
+            <CareCard title="Fertilizing" icon={<FertilizeIcon />} activity={lawnData.fertilizing} accentColor="bg-emerald-600" onLog={() => openActivityModal('fertilizing')} onHistory={() => openActivityHistory('fertilizing')} />
           </div>
-          {equipment.length === 0 ? (
-            <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-10 text-center">
-              <p className="text-gray-400 text-sm">No equipment yet.</p>
-              <button onClick={() => setShowAddEquip(true)} className="mt-2 text-sm font-semibold text-green-600 hover:text-green-700">
-                Add your first piece of equipment →
+
+          {/* Weather */}
+          <div className="mt-6">
+            <WeatherWidget zipCode={user.zipCode} />
+          </div>
+
+          {/* The Shed */}
+          <div className="mt-10">
+            <div className="flex items-end justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Your Shed</h2>
+                <p className="text-sm text-gray-400 mt-0.5">Equipment &amp; maintenance schedule</p>
+              </div>
+              <button
+                onClick={() => setShowAddEquip(true)}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 transition-colors px-3 py-1.5 rounded-lg"
+              >
+                <span className="text-base leading-none">+</span> Add Equipment
               </button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {equipment.map((e) => (
-                <EquipmentCard key={e.id} equipment={e} onLogMaintenance={openMaintModal} onHistoryMaintenance={openMaintenanceHistory} onEdit={setEditEquip} />
-              ))}
-            </div>
-          )}
-        </div>
+            {equipment.length === 0 ? (
+              <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-10 text-center">
+                <p className="text-gray-400 text-sm">No equipment yet.</p>
+                <button onClick={() => setShowAddEquip(true)} className="mt-2 text-sm font-semibold text-green-600 hover:text-green-700">
+                  Add your first piece of equipment →
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {equipment.map((e) => (
+                  <EquipmentCard key={e.id} equipment={e} onLogMaintenance={openMaintModal} onHistoryMaintenance={openMaintenanceHistory} onEdit={setEditEquip} />
+                ))}
+              </div>
+            )}
+          </div>
 
-        {/* Calendar */}
-        <LawnCalendar
-          lawnData={lawnData}
-          scheduledTasks={scheduledTasks}
-          onAddScheduled={handleAddScheduled}
-          onRemoveScheduled={handleRemoveScheduled}
-        />
-      </div>
+          {/* Calendar */}
+          <LawnCalendar
+            lawnData={lawnData}
+            scheduledTasks={scheduledTasks}
+            onAddScheduled={handleAddScheduled}
+            onRemoveScheduled={handleRemoveScheduled}
+          />
+        </div>
+      )}
+
+      {/* Photos tab */}
+      {activeTab === 'photos' && (
+        <div className="max-w-3xl mx-auto px-4 pt-6">
+          <LawnPhotoGallery
+            photos={photos}
+            onAdd={handleAddPhoto}
+            onDelete={handleDeletePhoto}
+          />
+        </div>
+      )}
 
       {/* Modals */}
       {showAddEquip && <AddEquipmentModal onClose={() => setShowAddEquip(false)} onSave={handleAddEquipment} />}
