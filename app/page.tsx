@@ -1542,25 +1542,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Care cards */}
-      <div className="max-w-3xl mx-auto px-4 -mt-12">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <CareCard title="Watering"    icon={<WaterIcon />}     activity={lawnData.watering}    accentColor="bg-blue-500"    onLog={() => openActivityModal('watering')}    onHistory={() => openActivityHistory('watering')}    onTip={() => setTipModal('watering')} />
-          <CareCard title="Mowing"      icon={<MowIcon />}       activity={lawnData.mowing}      accentColor="bg-green-600"   onLog={() => openActivityModal('mowing')}      onHistory={() => openActivityHistory('mowing')}      onTip={() => setTipModal('mowing')} />
-          <CareCard title="Fertilizing" icon={<FertilizeIcon />} activity={lawnData.fertilizing} accentColor="bg-emerald-600" onLog={() => openActivityModal('fertilizing')} onHistory={() => openActivityHistory('fertilizing')} onTip={() => setTipModal('fertilizing')} />
-        </div>
-
-        {/* Weather */}
-        <div className="mt-6">
-          <WeatherWidget zipCode={user.zipCode} />
-        </div>
       {/* Dashboard tab */}
       {activeTab === 'dashboard' && (
         <div className="max-w-3xl mx-auto px-4 -mt-12">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <CareCard title="Watering"    icon={<WaterIcon />}     activity={lawnData.watering}    accentColor="bg-blue-500"    onLog={() => openActivityModal('watering')}    onHistory={() => openActivityHistory('watering')} />
-            <CareCard title="Mowing"      icon={<MowIcon />}       activity={lawnData.mowing}      accentColor="bg-green-600"   onLog={() => openActivityModal('mowing')}      onHistory={() => openActivityHistory('mowing')} />
-            <CareCard title="Fertilizing" icon={<FertilizeIcon />} activity={lawnData.fertilizing} accentColor="bg-emerald-600" onLog={() => openActivityModal('fertilizing')} onHistory={() => openActivityHistory('fertilizing')} />
+            <CareCard title="Watering"    icon={<WaterIcon />}     activity={lawnData.watering}    accentColor="bg-blue-500"    onLog={() => openActivityModal('watering')}    onHistory={() => openActivityHistory('watering')}    onTip={() => setTipModal('watering')} />
+            <CareCard title="Mowing"      icon={<MowIcon />}       activity={lawnData.mowing}      accentColor="bg-green-600"   onLog={() => openActivityModal('mowing')}      onHistory={() => openActivityHistory('mowing')}      onTip={() => setTipModal('mowing')} />
+            <CareCard title="Fertilizing" icon={<FertilizeIcon />} activity={lawnData.fertilizing} accentColor="bg-emerald-600" onLog={() => openActivityModal('fertilizing')} onHistory={() => openActivityHistory('fertilizing')} onTip={() => setTipModal('fertilizing')} />
           </div>
 
           {/* Weather */}
