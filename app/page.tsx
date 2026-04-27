@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from './context/AuthContext'
 import WeatherWidget from './components/WeatherWidget'
+import LawnCalendar from './components/LawnCalendar'
 
 type ActivityType  = 'watering' | 'mowing' | 'fertilizing'
 type Status        = 'on_track' | 'due_soon' | 'overdue' | 'never'
@@ -49,6 +50,13 @@ interface Equipment {
 interface HistoryEntry {
   date: string
   detail?: string
+}
+
+interface ScheduledTask {
+  id: string
+  type: 'watering' | 'mowing' | 'fertilizing'
+  date: string
+  note?: string
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -1205,9 +1213,10 @@ export default function Dashboard() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
 
-  const [lawnData, setLawnData]     = useState<LawnData>(DEFAULT_LAWN)
-  const [equipment, setEquipment]   = useState<Equipment[]>(DEFAULT_EQUIPMENT)
-  const [hydrated, setHydrated]     = useState(false)
+  const [lawnData, setLawnData]           = useState<LawnData>(DEFAULT_LAWN)
+  const [equipment, setEquipment]         = useState<Equipment[]>(DEFAULT_EQUIPMENT)
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([])
+  const [hydrated, setHydrated]           = useState(false)
   const [showAddEquip, setShowAddEquip]   = useState(false)
   const [editEquip, setEditEquip]         = useState<Equipment | null>(null)
 
@@ -1228,29 +1237,37 @@ export default function Dashboard() {
     }
   }, [user, authLoading, router])
 
-  const lawnKey  = user ? `lawncare-lawn-v2-${user.id}`  : null
-  const equipKey = user ? `lawncare-equipment-v2-${user.id}` : null
+  const lawnKey      = user ? `lawncare-lawn-v2-${user.id}`       : null
+  const equipKey     = user ? `lawncare-equipment-v2-${user.id}`  : null
+  const scheduleKey  = user ? `lawncare-schedule-v1-${user.id}`   : null
 
   useEffect(() => {
-    if (!lawnKey || !equipKey) return
+    if (!lawnKey || !equipKey || !scheduleKey) return
     try {
-      const savedLawn  = localStorage.getItem(lawnKey)
-      const savedEquip = localStorage.getItem(equipKey)
-      if (savedLawn)  setLawnData(JSON.parse(savedLawn))
-      else            setLawnData(DEFAULT_LAWN)
-      if (savedEquip) setEquipment(JSON.parse(savedEquip))
-      else            setEquipment(DEFAULT_EQUIPMENT)
+      const savedLawn     = localStorage.getItem(lawnKey)
+      const savedEquip    = localStorage.getItem(equipKey)
+      const savedSchedule = localStorage.getItem(scheduleKey)
+      if (savedLawn)     setLawnData(JSON.parse(savedLawn))
+      else               setLawnData(DEFAULT_LAWN)
+      if (savedEquip)    setEquipment(JSON.parse(savedEquip))
+      else               setEquipment(DEFAULT_EQUIPMENT)
+      if (savedSchedule) setScheduledTasks(JSON.parse(savedSchedule))
+      else               setScheduledTasks([])
     } catch { /* ignore */ }
     setHydrated(true)
-  }, [lawnKey, equipKey])
+  }, [lawnKey, equipKey, scheduleKey])
 
   useEffect(() => {
-    if (hydrated && lawnKey)  localStorage.setItem(lawnKey,  JSON.stringify(lawnData))
+    if (hydrated && lawnKey)     localStorage.setItem(lawnKey,     JSON.stringify(lawnData))
   }, [lawnData, hydrated, lawnKey])
 
   useEffect(() => {
-    if (hydrated && equipKey) localStorage.setItem(equipKey, JSON.stringify(equipment))
+    if (hydrated && equipKey)    localStorage.setItem(equipKey,    JSON.stringify(equipment))
   }, [equipment, hydrated, equipKey])
+
+  useEffect(() => {
+    if (hydrated && scheduleKey) localStorage.setItem(scheduleKey, JSON.stringify(scheduledTasks))
+  }, [scheduledTasks, hydrated, scheduleKey])
 
   function openActivityModal(type: ActivityType) {
     setLogDate(todayStr())
@@ -1296,6 +1313,14 @@ export default function Dashboard() {
   function handleEditEquipment(updated: Equipment) {
     setEquipment((prev) => prev.map((e) => e.id === updated.id ? updated : e))
     setEditEquip(null)
+  }
+
+  function handleAddScheduled(task: Omit<ScheduledTask, 'id'>) {
+    setScheduledTasks((prev) => [...prev, { ...task, id: Date.now().toString() }])
+  }
+
+  function handleRemoveScheduled(id: string) {
+    setScheduledTasks((prev) => prev.filter((t) => t.id !== id))
   }
 
   function openActivityHistory(type: ActivityType) {
@@ -1410,6 +1435,14 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* Calendar */}
+        <LawnCalendar
+          lawnData={lawnData}
+          scheduledTasks={scheduledTasks}
+          onAddScheduled={handleAddScheduled}
+          onRemoveScheduled={handleRemoveScheduled}
+        />
       </div>
 
       {/* Modals */}
