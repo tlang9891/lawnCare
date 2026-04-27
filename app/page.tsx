@@ -284,6 +284,112 @@ function CloseIcon() {
   )
 }
 
+function InfoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+  )
+}
+
+// ── Tips content ──────────────────────────────────────────────────────────────
+
+const TIPS: Record<ActivityType, { title: string; tips: { heading: string; body: string }[] }> = {
+  watering: {
+    title: 'Watering Tips',
+    tips: [
+      {
+        heading: 'Water deeply, not daily',
+        body: 'Aim for 1–1.5 inches of water per week. One or two deep sessions beat shallow daily watering — deep watering encourages roots to grow downward, making your lawn more drought-resistant.',
+      },
+      {
+        heading: 'Best time to water',
+        body: 'Water early in the morning (6–10 AM). This gives blades time to dry before nightfall, reducing the risk of fungal disease. Avoid watering in the evening.',
+      },
+      {
+        heading: 'Watch for signs of thirst',
+        body: 'When grass looks blue-gray, footprints stay visible, or blades curl lengthwise, your lawn is telling you it needs water.',
+      },
+    ],
+  },
+  mowing: {
+    title: 'Mowing Tips',
+    tips: [
+      {
+        heading: 'Follow the one-third rule',
+        body: "Never remove more than one-third of the blade height in a single mow. Cutting too short stresses the grass and exposes soil to weeds and sun.",
+      },
+      {
+        heading: 'Ideal mowing height',
+        body: 'Most cool-season grasses (fescue, bluegrass, ryegrass) thrive at 3–4 inches. Warm-season grasses (Bermuda, Zoysia) prefer 1–2 inches. Taller grass shades roots and retains moisture.',
+      },
+      {
+        heading: 'Mow frequency',
+        body: 'During peak growing season mow every 5–7 days. Slow growth in summer heat or fall means you can stretch to every 10–14 days.',
+      },
+      {
+        heading: 'Keep blades sharp',
+        body: 'Dull blades tear grass instead of cutting it cleanly, leaving ragged edges that turn brown and invite disease. Sharpen blades at least once per season.',
+      },
+    ],
+  },
+  fertilizing: {
+    title: 'Fertilizing Tips',
+    tips: [
+      {
+        heading: 'Timing matters',
+        body: 'Cool-season grasses benefit most from fall fertilizing (September–November) when roots are actively growing. Warm-season grasses should be fed in late spring through summer.',
+      },
+      {
+        heading: 'N-P-K basics',
+        body: 'Fertilizer labels show three numbers (e.g. 10-10-10): Nitrogen (N) for green growth, Phosphorus (P) for roots, Potassium (K) for stress resistance. A high-nitrogen formula is ideal for established lawns.',
+      },
+      {
+        heading: 'Slow-release vs. quick-release',
+        body: 'Slow-release fertilizers feed steadily over weeks and reduce burn risk — great for summer. Quick-release gives a rapid green-up but must be watered in immediately.',
+      },
+      {
+        heading: 'Don\'t over-fertilize',
+        body: 'Too much nitrogen causes rapid, weak growth and can burn your lawn. Stick to the bag\'s recommended rate and get a soil test every 2–3 years to know exactly what your lawn needs.',
+      },
+    ],
+  },
+}
+
+// ── Tips Modal ────────────────────────────────────────────────────────────────
+
+function TipsModal({ type, onClose }: { type: ActivityType; onClose: () => void }) {
+  const { title, tips } = TIPS[type]
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[80vh]">
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="text-base font-bold text-gray-900">{title}</h2>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
+            <CloseIcon />
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+          {tips.map((tip) => (
+            <div key={tip.heading} className="bg-green-50 rounded-xl p-4">
+              <p className="text-sm font-bold text-green-800 mb-1">{tip.heading}</p>
+              <p className="text-sm text-green-700 leading-relaxed">{tip.body}</p>
+            </div>
+          ))}
+        </div>
+        <div className="px-5 pb-5 pt-3 border-t border-gray-100 flex-shrink-0">
+          <button onClick={onClose} className="w-full py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── CareCard ──────────────────────────────────────────────────────────────────
 
 interface CareCardProps {
@@ -292,10 +398,11 @@ interface CareCardProps {
   activity: Activity
   onLog: () => void
   onHistory: () => void
+  onTip: () => void
   accentColor: string
 }
 
-function CareCard({ title, icon, activity, onLog, onHistory, accentColor }: CareCardProps) {
+function CareCard({ title, icon, activity, onLog, onHistory, onTip, accentColor }: CareCardProps) {
   const lastLog = activity.logs[0] ?? null
   const status  = getStatus(activity.nextRecommended)
   const days    = daysUntil(activity.nextRecommended)
@@ -331,7 +438,12 @@ function CareCard({ title, icon, activity, onLog, onHistory, accentColor }: Care
           </div>
           <StatusBadge status={status} />
         </div>
-        <h3 className="text-base font-bold text-gray-900 mb-3">{title}</h3>
+        <div className="flex items-center gap-1.5 mb-3">
+          <h3 className="text-base font-bold text-gray-900">{title}</h3>
+          <button onClick={onTip} title={`${title} tips`} className="text-gray-300 hover:text-green-500 transition-colors flex-shrink-0">
+            <InfoIcon />
+          </button>
+        </div>
         <div className="space-y-2 mb-4 flex-1">
           <div className="flex justify-between text-sm">
             <span className="text-gray-400">Last logged</span>
@@ -1223,6 +1335,7 @@ export default function Dashboard() {
   const [showAddEquip, setShowAddEquip]     = useState(false)
   const [editEquip, setEditEquip]           = useState<Equipment | null>(null)
 
+  const [tipModal, setTipModal]       = useState<ActivityType | null>(null)
   const [activeModal, setActiveModal] = useState<ActivityType | null>(null)
   const [logDate, setLogDate]         = useState(todayStr())
   const [logDuration, setLogDuration] = useState('45')
@@ -1429,6 +1542,18 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Care cards */}
+      <div className="max-w-3xl mx-auto px-4 -mt-12">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <CareCard title="Watering"    icon={<WaterIcon />}     activity={lawnData.watering}    accentColor="bg-blue-500"    onLog={() => openActivityModal('watering')}    onHistory={() => openActivityHistory('watering')}    onTip={() => setTipModal('watering')} />
+          <CareCard title="Mowing"      icon={<MowIcon />}       activity={lawnData.mowing}      accentColor="bg-green-600"   onLog={() => openActivityModal('mowing')}      onHistory={() => openActivityHistory('mowing')}      onTip={() => setTipModal('mowing')} />
+          <CareCard title="Fertilizing" icon={<FertilizeIcon />} activity={lawnData.fertilizing} accentColor="bg-emerald-600" onLog={() => openActivityModal('fertilizing')} onHistory={() => openActivityHistory('fertilizing')} onTip={() => setTipModal('fertilizing')} />
+        </div>
+
+        {/* Weather */}
+        <div className="mt-6">
+          <WeatherWidget zipCode={user.zipCode} />
+        </div>
       {/* Dashboard tab */}
       {activeTab === 'dashboard' && (
         <div className="max-w-3xl mx-auto px-4 -mt-12">
@@ -1507,6 +1632,8 @@ export default function Dashboard() {
       {historyModal && (
         <HistoryModal title={historyModal.title} entries={historyModal.entries} dotColor={historyModal.dotColor} onClose={() => setHistoryModal(null)} />
       )}
+
+      {tipModal && <TipsModal type={tipModal} onClose={() => setTipModal(null)} />}
     </div>
   )
 }
