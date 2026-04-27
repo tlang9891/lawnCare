@@ -974,7 +974,7 @@ function EquipmentPhoto({ equipment }: { equipment: Equipment }) {
   }
 
   const fallbackSrc = equipment.type === 'mower' && equipment.mowerSubType && !imgError
-    ? (equipment.mowerSubType === 'riding' ? '/Riding.png' : '/push.jpg')
+    ? (equipment.mowerSubType === 'riding' ? '/riding.png' : '/push.jpg')
     : null
 
   if (fallbackSrc) {
