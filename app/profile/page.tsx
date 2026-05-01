@@ -194,20 +194,25 @@ export default function ProfilePage() {
   async function handleSave() {
     if (!validate()) return
     setSaving(true)
-    updateProfile({
-      firstName: firstName.trim(),
-      lastName:  lastName.trim(),
-      zipCode:   zipCode.trim().toUpperCase(),
-      city:      city.trim(),
-      state:     state.trim(),
-      country,
-      grassType,
-      lawnSizeSqFt: Number(lawnSize) || 0,
-      avatarDataUrl,
-    })
-    setSaving(false)
-    setSaveSuccess(true)
-    setTimeout(() => setSaveSuccess(false), 2500)
+    try {
+      await updateProfile({
+        firstName: firstName.trim(),
+        lastName:  lastName.trim(),
+        zipCode:   zipCode.trim().toUpperCase(),
+        city:      city.trim(),
+        state:     state.trim(),
+        country,
+        grassType,
+        lawnSizeSqFt: Number(lawnSize) || 0,
+        avatarDataUrl,
+      })
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 2500)
+    } catch {
+      // surface error if needed in future
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (authLoading || !user) {

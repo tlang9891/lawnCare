@@ -59,28 +59,23 @@ function SignupForm() {
 
   function validate(): boolean {
     const next: Record<string, string> = {}
-
     if (!firstName.trim()) next.firstName = 'First name is required.'
     if (!lastName.trim())  next.lastName  = 'Last name is required.'
-
     if (!email.trim()) {
       next.email = 'Email is required.'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       next.email = 'Enter a valid email address.'
     }
-
     if (!password) {
       next.password = 'Password is required.'
     } else if (password.length < 8) {
       next.password = 'Password must be at least 8 characters.'
     }
-
     if (!confirmPassword) {
       next.confirmPassword = 'Please confirm your password.'
     } else if (password !== confirmPassword) {
       next.confirmPassword = 'Passwords do not match.'
     }
-
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -89,7 +84,6 @@ function SignupForm() {
     e.preventDefault()
     setGlobalError('')
     if (!validate()) return
-
     setSubmitting(true)
     try {
       await signup({ firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password })
@@ -107,7 +101,6 @@ function SignupForm() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
       <Logo />
-
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
         <h1 className="text-xl font-bold text-gray-900 mb-1">Create your account</h1>
         <p className="text-sm text-gray-400 mb-7">Takes about 2 minutes. We&apos;ll set everything up for you.</p>

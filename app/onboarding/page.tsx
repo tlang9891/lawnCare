@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/context/AuthContext'
 import type { GrassType } from '@/app/context/AuthContext'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 type Step = 1 | 2 | 3
 
 interface MowerData {
@@ -16,8 +14,6 @@ interface MowerData {
   skip: boolean
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 const MOWER_MAINTENANCE_DEFAULTS = [
   { name: 'Oil Change',            intervalMonths: 6  },
   { name: 'Blade Sharpen/Replace', intervalMonths: 6  },
@@ -25,8 +21,6 @@ const MOWER_MAINTENANCE_DEFAULTS = [
   { name: 'Spark Plug Replace',    intervalMonths: 12 },
   { name: 'Fuel Filter Replace',   intervalMonths: 12 },
 ]
-
-// ── Icons ─────────────────────────────────────────────────────────────────────
 
 function Logo() {
   return (
@@ -51,14 +45,12 @@ function ChevronIcon() {
   )
 }
 
-// ── Step indicator ────────────────────────────────────────────────────────────
-
 function StepIndicator({ current, total }: { current: Step; total: number }) {
   return (
     <div className="flex items-center gap-2">
       {Array.from({ length: total }, (_, i) => {
         const n = (i + 1) as Step
-        const done = n < current
+        const done   = n < current
         const active = n === current
         return (
           <div key={n} className="flex items-center gap-2">
@@ -68,7 +60,8 @@ function StepIndicator({ current, total }: { current: Step; total: number }) {
                        'bg-gray-100 text-gray-400'
             }`}>
               {done ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                  strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               ) : n}
@@ -85,15 +78,13 @@ function StepIndicator({ current, total }: { current: Step; total: number }) {
 
 // ── Step 1: Location ──────────────────────────────────────────────────────────
 
-interface Step1Props {
+function Step1Location({ city, setCity, state, setState, country, setCountry, zipCode, setZipCode, onNext }: {
   city: string; setCity: (v: string) => void
   state: string; setState: (v: string) => void
   country: string; setCountry: (v: string) => void
   zipCode: string; setZipCode: (v: string) => void
   onNext: () => void
-}
-
-function Step1Location({ city, setCity, state, setState, country, setCountry, zipCode, setZipCode, onNext }: Step1Props) {
+}) {
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   function validate() {
@@ -102,19 +93,13 @@ function Step1Location({ city, setCity, state, setState, country, setCountry, zi
     if (!state.trim())   next.state   = 'State / province is required.'
     if (!country.trim()) next.country = 'Country is required.'
     const zip = zipCode.trim().toUpperCase()
-    const usZip    = /^\d{5}(-\d{4})?$/
-    const caPostal = /^[A-Z]\d[A-Z][ -]?\d[A-Z]\d$/
     if (!zip) {
       next.zipCode = 'ZIP or postal code is required.'
-    } else if (!usZip.test(zip) && !caPostal.test(zip)) {
+    } else if (!/^\d{5}(-\d{4})?$/.test(zip) && !/^[A-Z]\d[A-Z][ -]?\d[A-Z]\d$/.test(zip)) {
       next.zipCode = 'Enter a valid US ZIP (e.g. 90210) or Canadian postal code (e.g. K1A 0A9).'
     }
     setErrors(next)
     return Object.keys(next).length === 0
-  }
-
-  function handleNext() {
-    if (validate()) onNext()
   }
 
   const inputClass = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
@@ -126,7 +111,6 @@ function Step1Location({ city, setCity, state, setState, country, setCountry, zi
         <h2 className="text-xl font-bold text-gray-900">Where do you live?</h2>
         <p className="text-sm text-gray-400 mt-1">We&apos;ll use this to set up your local weather.</p>
       </div>
-
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <label className={labelClass}>City</label>
@@ -154,8 +138,7 @@ function Step1Location({ city, setCity, state, setState, country, setCountry, zi
           {errors.zipCode && <p className="mt-1.5 text-xs text-red-500">{errors.zipCode}</p>}
         </div>
       </div>
-
-      <button onClick={handleNext}
+      <button onClick={() => validate() && onNext()}
         className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors">
         Continue
       </button>
@@ -165,14 +148,10 @@ function Step1Location({ city, setCity, state, setState, country, setCountry, zi
 
 // ── Step 2: Mower ─────────────────────────────────────────────────────────────
 
-interface Step2Props {
-  mower: MowerData
-  setMower: (v: MowerData) => void
-  onNext: () => void
-  onBack: () => void
-}
-
-function Step2Mower({ mower, setMower, onNext, onBack }: Step2Props) {
+function Step2Mower({ mower, setMower, onNext, onBack }: {
+  mower: MowerData; setMower: (v: MowerData) => void
+  onNext: () => void; onBack: () => void
+}) {
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   function validate() {
@@ -182,10 +161,6 @@ function Step2Mower({ mower, setMower, onNext, onBack }: Step2Props) {
     if (!mower.model.trim()) next.model = 'Model is required.'
     setErrors(next)
     return Object.keys(next).length === 0
-  }
-
-  function handleNext() {
-    if (validate()) onNext()
   }
 
   const inputClass = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
@@ -216,13 +191,11 @@ function Step2Mower({ mower, setMower, onNext, onBack }: Step2Props) {
               {errors.model && <p className="mt-1.5 text-xs text-red-500">{errors.model}</p>}
             </div>
           </div>
-
           <div>
             <label className={labelClass}>Mower Type</label>
             <div className="grid grid-cols-2 gap-2">
               {(['riding', 'push'] as const).map((t) => (
-                <button key={t} type="button"
-                  onClick={() => setMower({ ...mower, subType: t })}
+                <button key={t} type="button" onClick={() => setMower({ ...mower, subType: t })}
                   className={`py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
                     mower.subType === t
                       ? 'bg-green-600 text-white border-green-600'
@@ -236,10 +209,8 @@ function Step2Mower({ mower, setMower, onNext, onBack }: Step2Props) {
         </>
       )}
 
-      <button
-        onClick={() => setMower({ make: '', model: '', subType: null, skip: !mower.skip })}
-        className="w-full py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-colors"
-      >
+      <button onClick={() => setMower({ make: '', model: '', subType: null, skip: !mower.skip })}
+        className="w-full py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-colors">
         {mower.skip ? 'I have a mower to add' : "I don't have a mower yet — skip"}
       </button>
 
@@ -248,7 +219,7 @@ function Step2Mower({ mower, setMower, onNext, onBack }: Step2Props) {
           className="flex-1 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
           Back
         </button>
-        <button onClick={handleNext}
+        <button onClick={() => validate() && onNext()}
           className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors">
           Continue
         </button>
@@ -259,15 +230,12 @@ function Step2Mower({ mower, setMower, onNext, onBack }: Step2Props) {
 
 // ── Step 3: Lawn ──────────────────────────────────────────────────────────────
 
-interface Step3Props {
+function Step3Lawn({ lawnSize, setLawnSize, grassType, setGrassType, onFinish, onBack, submitting, error }: {
   lawnSize: string; setLawnSize: (v: string) => void
   grassType: GrassType; setGrassType: (v: GrassType) => void
-  onFinish: () => void
-  onBack: () => void
-  submitting: boolean
-}
-
-function Step3Lawn({ lawnSize, setLawnSize, grassType, setGrassType, onFinish, onBack, submitting }: Step3Props) {
+  onFinish: () => void; onBack: () => void
+  submitting: boolean; error: string
+}) {
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   function validate() {
@@ -275,10 +243,6 @@ function Step3Lawn({ lawnSize, setLawnSize, grassType, setGrassType, onFinish, o
     if (!lawnSize || Number(lawnSize) <= 0) next.lawnSize = 'Enter a valid lawn size.'
     setErrors(next)
     return Object.keys(next).length === 0
-  }
-
-  function handleFinish() {
-    if (validate()) onFinish()
   }
 
   const inputClass = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
@@ -315,9 +279,15 @@ function Step3Lawn({ lawnSize, setLawnSize, grassType, setGrassType, onFinish, o
         </div>
       </div>
 
+      {error && (
+        <div className="px-4 py-3 bg-red-50 border border-red-100 rounded-xl">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
       <div className="bg-green-50 rounded-xl p-4">
-        <p className="text-xs font-bold text-green-700 mb-2 uppercase tracking-wide">You&apos;re almost done!</p>
-        <p className="text-sm text-green-700">After this we&apos;ll drop you straight onto your dashboard to start tracking.</p>
+        <p className="text-xs font-bold text-green-700 mb-1 uppercase tracking-wide">Almost done!</p>
+        <p className="text-sm text-green-700">After this we&apos;ll drop you straight onto your dashboard.</p>
       </div>
 
       <div className="flex gap-3">
@@ -325,7 +295,7 @@ function Step3Lawn({ lawnSize, setLawnSize, grassType, setGrassType, onFinish, o
           className="flex-1 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
           Back
         </button>
-        <button onClick={handleFinish} disabled={submitting}
+        <button onClick={() => validate() && onFinish()} disabled={submitting}
           className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors">
           {submitting ? 'Setting up…' : 'Go to Dashboard'}
         </button>
@@ -334,25 +304,23 @@ function Step3Lawn({ lawnSize, setLawnSize, grassType, setGrassType, onFinish, o
   )
 }
 
-// ── Main Onboarding Page ──────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function OnboardingPage() {
   const { user, loading, completeOnboarding } = useAuth()
   const router = useRouter()
 
-  const [step, setStep]         = useState<Step>(1)
+  const [step, setStep]           = useState<Step>(1)
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
-  // Step 1
-  const [city, setCity]         = useState('')
-  const [state, setState]       = useState('')
-  const [country, setCountry]   = useState('')
-  const [zipCode, setZipCode]   = useState('')
+  const [city, setCity]       = useState('')
+  const [state, setState]     = useState('')
+  const [country, setCountry] = useState('')
+  const [zipCode, setZipCode] = useState('')
 
-  // Step 2
   const [mower, setMower] = useState<MowerData>({ make: '', model: '', subType: null, skip: false })
 
-  // Step 3
   const [lawnSize, setLawnSize]   = useState('')
   const [grassType, setGrassType] = useState<GrassType>('bermuda')
 
@@ -364,39 +332,40 @@ export default function OnboardingPage() {
   async function handleFinish() {
     if (!user) return
     setSubmitting(true)
+    setSubmitError('')
+    try {
+      await completeOnboarding({ city, state, country, zipCode, lawnSizeSqFt: Number(lawnSize), grassType })
 
-    completeOnboarding({
-      city, state, country, zipCode,
-      lawnSizeSqFt: Number(lawnSize),
-      grassType,
-    })
-
-    // Add the mower to the equipment store if the user filled it in
-    if (!mower.skip && mower.make.trim() && mower.model.trim()) {
-      const equipKey = `lawncare-equipment-v2-${user.id}`
-      const existing = (() => { try { return JSON.parse(localStorage.getItem(equipKey) ?? '[]') } catch { return [] } })()
-      const newMower = {
-        id: Date.now().toString(),
-        type: 'mower',
-        mowerSubType: mower.subType ?? undefined,
-        year: new Date().getFullYear().toString(),
-        make: mower.make.trim(),
-        model: mower.model.trim(),
-        purchaseDate: null,
-        purchaseLocation: '',
-        receiptDataUrl: null,
-        photoDataUrl: null,
-        maintenance: MOWER_MAINTENANCE_DEFAULTS.map((m, i) => ({
-          id: `${Date.now()}-${i}`,
-          name: m.name,
-          logDates: [],
-          intervalMonths: m.intervalMonths,
-        })),
+      if (!mower.skip && mower.make.trim() && mower.model.trim()) {
+        const equipKey = `lawncare-equipment-v2-${user.id}`
+        const existing = (() => { try { return JSON.parse(localStorage.getItem(equipKey) ?? '[]') } catch { return [] } })()
+        const newMower = {
+          id: Date.now().toString(),
+          type: 'mower',
+          mowerSubType: mower.subType ?? undefined,
+          year: new Date().getFullYear().toString(),
+          make: mower.make.trim(),
+          model: mower.model.trim(),
+          purchaseDate: null,
+          purchaseLocation: '',
+          receiptDataUrl: null,
+          photoDataUrl: null,
+          maintenance: MOWER_MAINTENANCE_DEFAULTS.map((m, i) => ({
+            id: `${Date.now()}-${i}`,
+            name: m.name,
+            logDates: [],
+            intervalMonths: m.intervalMonths,
+          })),
+        }
+        localStorage.setItem(equipKey, JSON.stringify([...existing, newMower]))
       }
-      localStorage.setItem(equipKey, JSON.stringify([...existing, newMower]))
-    }
 
-    router.push('/')
+      router.push('/')
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (loading || !user) {
@@ -411,7 +380,6 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 py-4">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <Logo />
@@ -419,29 +387,25 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      {/* Progress */}
       <div className="bg-white border-b border-gray-100 px-4 py-5">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-3">
             <StepIndicator current={step} total={3} />
             <div className="flex gap-4 ml-6">
               {stepLabels.map((label, i) => (
-                <span key={label} className={`text-xs font-semibold ${i + 1 === step ? 'text-green-600' : i + 1 < step ? 'text-gray-400' : 'text-gray-300'}`}>
-                  {label}
-                </span>
+                <span key={label} className={`text-xs font-semibold ${
+                  i + 1 === step ? 'text-green-600' : i + 1 < step ? 'text-gray-400' : 'text-gray-300'
+                }`}>{label}</span>
               ))}
             </div>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-1.5">
-            <div
-              className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
-              style={{ width: `${((step - 1) / 2) * 100 + 33}%` }}
-            />
+            <div className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+              style={{ width: `${((step - 1) / 2) * 100 + 33}%` }} />
           </div>
         </div>
       </div>
 
-      {/* Welcome banner — shown on step 1 only */}
       {step === 1 && (
         <div className="bg-gradient-to-r from-green-700 to-green-600 px-4 py-5">
           <div className="max-w-lg mx-auto">
@@ -451,33 +415,22 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {/* Form */}
       <div className="flex-1 px-4 py-8">
         <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
           {step === 1 && (
-            <Step1Location
-              city={city} setCity={setCity}
-              state={state} setState={setState}
-              country={country} setCountry={setCountry}
-              zipCode={zipCode} setZipCode={setZipCode}
-              onNext={() => setStep(2)}
-            />
+            <Step1Location city={city} setCity={setCity} state={state} setState={setState}
+              country={country} setCountry={setCountry} zipCode={zipCode} setZipCode={setZipCode}
+              onNext={() => setStep(2)} />
           )}
           {step === 2 && (
-            <Step2Mower
-              mower={mower} setMower={setMower}
-              onNext={() => setStep(3)}
-              onBack={() => setStep(1)}
-            />
+            <Step2Mower mower={mower} setMower={setMower}
+              onNext={() => setStep(3)} onBack={() => setStep(1)} />
           )}
           {step === 3 && (
-            <Step3Lawn
-              lawnSize={lawnSize} setLawnSize={setLawnSize}
+            <Step3Lawn lawnSize={lawnSize} setLawnSize={setLawnSize}
               grassType={grassType} setGrassType={setGrassType}
-              onFinish={handleFinish}
-              onBack={() => setStep(2)}
-              submitting={submitting}
-            />
+              onFinish={handleFinish} onBack={() => setStep(2)}
+              submitting={submitting} error={submitError} />
           )}
         </div>
       </div>
