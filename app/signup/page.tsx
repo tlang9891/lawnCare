@@ -20,23 +20,6 @@ function Logo() {
   )
 }
 
-function EyeIcon({ open }: { open: boolean }) {
-  return open ? (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-      strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-      <line x1="1" y1="1" x2="23" y2="23" />
-    </svg>
-  )
-}
-
 function FieldError({ message }: { message?: string }) {
   if (!message) return null
   return <p className="mt-1.5 text-xs text-red-500">{message}</p>
@@ -44,20 +27,23 @@ function FieldError({ message }: { message?: string }) {
 
 function SignupForm() {
   const router = useRouter()
-  const { signup } = useAuth()
+  const { sendOtp, verifyOtp } = useAuth()
 
-  const [firstName, setFirstName]             = useState('')
-  const [lastName, setLastName]               = useState('')
-  const [email, setEmail]                     = useState('')
-  const [password, setPassword]               = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [showPassword, setShowPassword]       = useState(false)
-  const [showConfirm, setShowConfirm]         = useState(false)
-  const [submitting, setSubmitting]           = useState(false)
-  const [errors, setErrors]                   = useState<Record<string, string>>({})
-  const [globalError, setGlobalError]         = useState('')
+  const [step, setStep]           = useState<'details' | 'otp'>('details')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName]   = useState('')
+  const [email, setEmail]         = useState('')
+  const [otp, setOtp]             = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [errors, setErrors]       = useState<Record<string, string>>({})
+  const [globalError, setGlobalError] = useState('')
 
-  function validate(): boolean {
+  const inputClass = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
+  const labelClass = 'block text-sm font-medium text-gray-700 mb-1.5'
+
+  async function handleDetailsSubmit(e: FormEvent) {
+    e.preventDefault()
+    setGlobalError('')
     const next: Record<string, string> = {}
     if (!firstName.trim()) next.firstName = 'First name is required.'
     if (!lastName.trim())  next.lastName  = 'Last name is required.'
@@ -66,28 +52,13 @@ function SignupForm() {
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       next.email = 'Enter a valid email address.'
     }
-    if (!password) {
-      next.password = 'Password is required.'
-    } else if (password.length < 8) {
-      next.password = 'Password must be at least 8 characters.'
-    }
-    if (!confirmPassword) {
-      next.confirmPassword = 'Please confirm your password.'
-    } else if (password !== confirmPassword) {
-      next.confirmPassword = 'Passwords do not match.'
-    }
     setErrors(next)
-    return Object.keys(next).length === 0
-  }
+    if (Object.keys(next).length > 0) return
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setGlobalError('')
-    if (!validate()) return
     setSubmitting(true)
     try {
-      await signup({ firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password })
-      router.push('/onboarding')
+      await sendOtp(email.trim(), { firstName: firstName.trim(), lastName: lastName.trim() })
+      setStep('otp')
     } catch (err) {
       setGlobalError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
@@ -95,83 +66,122 @@ function SignupForm() {
     }
   }
 
-  const inputClass = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
-  const labelClass = 'block text-sm font-medium text-gray-700 mb-1.5'
+  async function handleOtpSubmit(e: FormEvent) {
+    e.preventDefault()
+    setGlobalError('')
+    const next: Record<string, string> = {}
+    if (!otp.trim()) {
+      next.otp = 'Code is required.'
+    } else if (!/^\d{6}$/.test(otp.trim())) {
+      next.otp = 'Enter the 6-digit code from your email.'
+    }
+    setErrors(next)
+    if (Object.keys(next).length > 0) return
+
+    setSubmitting(true)
+    try {
+      const { isNewUser } = await verifyOtp(email.trim(), otp.trim())
+      router.push(isNewUser ? '/onboarding' : '/')
+    } catch (err) {
+      setGlobalError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
       <Logo />
+
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Create your account</h1>
-        <p className="text-sm text-gray-400 mb-7">Takes about 2 minutes. We&apos;ll set everything up for you.</p>
+        {step === 'details' ? (
+          <>
+            <h1 className="text-xl font-bold text-gray-900 mb-1">Create your account</h1>
+            <p className="text-sm text-gray-400 mb-7">No password needed — we&apos;ll email you a code to sign in.</p>
 
-        {globalError && (
-          <div className="mb-5 px-4 py-3 bg-red-50 border border-red-100 rounded-xl">
-            <p className="text-sm text-red-600">{globalError}</p>
-          </div>
+            {globalError && (
+              <div className="mb-5 px-4 py-3 bg-red-50 border border-red-100 rounded-xl">
+                <p className="text-sm text-red-600">{globalError}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleDetailsSubmit} noValidate className="space-y-5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>First Name</label>
+                  <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Jane" autoComplete="given-name" className={inputClass} />
+                  <FieldError message={errors.firstName} />
+                </div>
+                <div>
+                  <label className={labelClass}>Last Name</label>
+                  <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Smith" autoComplete="family-name" className={inputClass} />
+                  <FieldError message={errors.lastName} />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Email</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="jane@example.com" autoComplete="email" className={inputClass} />
+                <FieldError message={errors.email} />
+              </div>
+
+              <button type="submit" disabled={submitting}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-semibold rounded-xl py-2.5 transition-colors mt-2">
+                {submitting ? 'Sending code…' : 'Continue'}
+              </button>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-gray-400">
+              Already have an account?{' '}
+              <Link href="/login" className="text-green-600 font-semibold hover:text-green-700">Sign in</Link>
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="text-xl font-bold text-gray-900 mb-1">Check your email</h1>
+            <p className="text-sm text-gray-400 mb-7">
+              We sent a 6-digit code to <span className="font-medium text-gray-600">{email}</span>.
+            </p>
+
+            {globalError && (
+              <div className="mb-5 px-4 py-3 bg-red-50 border border-red-100 rounded-xl">
+                <p className="text-sm text-red-600">{globalError}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleOtpSubmit} noValidate className="space-y-5">
+              <div>
+                <label className={labelClass}>6-digit code</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  placeholder="123456"
+                  autoComplete="one-time-code"
+                  className={`${inputClass} tracking-widest text-center text-lg`}
+                />
+                <FieldError message={errors.otp} />
+              </div>
+
+              <button type="submit" disabled={submitting}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-semibold rounded-xl py-2.5 transition-colors mt-2">
+                {submitting ? 'Verifying…' : 'Create Account'}
+              </button>
+            </form>
+
+            <button
+              onClick={() => { setStep('details'); setOtp(''); setGlobalError(''); setErrors({}) }}
+              className="mt-4 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Go back
+            </button>
+          </>
         )}
-
-        <form onSubmit={handleSubmit} noValidate className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelClass}>First Name</label>
-              <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Jane" autoComplete="given-name" className={inputClass} />
-              <FieldError message={errors.firstName} />
-            </div>
-            <div>
-              <label className={labelClass}>Last Name</label>
-              <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
-                placeholder="Smith" autoComplete="family-name" className={inputClass} />
-              <FieldError message={errors.lastName} />
-            </div>
-          </div>
-
-          <div>
-            <label className={labelClass}>Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder="jane@example.com" autoComplete="email" className={inputClass} />
-            <FieldError message={errors.email} />
-          </div>
-
-          <div>
-            <label className={labelClass}>Password</label>
-            <div className="relative">
-              <input type={showPassword ? 'text' : 'password'} value={password}
-                onChange={(e) => setPassword(e.target.value)} placeholder="Min. 8 characters"
-                autoComplete="new-password" className={`${inputClass} pr-10`} />
-              <button type="button" onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                <EyeIcon open={showPassword} />
-              </button>
-            </div>
-            <FieldError message={errors.password} />
-          </div>
-
-          <div>
-            <label className={labelClass}>Confirm Password</label>
-            <div className="relative">
-              <input type={showConfirm ? 'text' : 'password'} value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter your password"
-                autoComplete="new-password" className={`${inputClass} pr-10`} />
-              <button type="button" onClick={() => setShowConfirm((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                <EyeIcon open={showConfirm} />
-              </button>
-            </div>
-            <FieldError message={errors.confirmPassword} />
-          </div>
-
-          <button type="submit" disabled={submitting}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-semibold rounded-xl py-2.5 transition-colors mt-2">
-            {submitting ? 'Creating account…' : 'Create Account'}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-gray-400">
-          Already have an account?{' '}
-          <Link href="/login" className="text-green-600 font-semibold hover:text-green-700">Sign in</Link>
-        </p>
       </div>
     </div>
   )
