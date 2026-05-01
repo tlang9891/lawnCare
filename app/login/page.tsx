@@ -68,8 +68,8 @@ function LoginForm() {
     const next: Record<string, string> = {}
     if (!otp.trim()) {
       next.otp = 'Code is required.'
-    } else if (!/^\d{6}$/.test(otp.trim())) {
-      next.otp = 'Enter the 6-digit code from your email.'
+    } else if (otp.trim().length !== 8) {
+      next.otp = 'Enter the 8-character code from your email.'
     }
     setErrors(next)
     if (Object.keys(next).length > 0) return
@@ -135,7 +135,7 @@ function LoginForm() {
           <>
             <h1 className="text-xl font-bold text-gray-900 mb-1">Check your email</h1>
             <p className="text-sm text-gray-400 mb-7">
-              We sent a 6-digit code to <span className="font-medium text-gray-600">{email}</span>.
+              We sent an 8-character code to <span className="font-medium text-gray-600">{email}</span>.
             </p>
 
             {globalError && (
@@ -146,14 +146,14 @@ function LoginForm() {
 
             <form onSubmit={handleOtpSubmit} noValidate className="space-y-5">
               <div>
-                <label className={labelClass}>6-digit code</label>
+                <label className={labelClass}>8-character code</label>
                 <input
                   type="text"
                   inputMode="numeric"
-                  maxLength={6}
+                  maxLength={8}
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  placeholder="123456"
+                  onChange={(e) => setOtp(e.target.value)}
+                  placeholder="12345678"
                   autoComplete="one-time-code"
                   className={`${inputClass} tracking-widest text-center text-lg`}
                 />

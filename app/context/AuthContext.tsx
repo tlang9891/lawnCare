@@ -103,7 +103,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        const profile = await fetchProfile(session.user.id, session.user.email ?? '')
+        let profile = await fetchProfile(session.user.id, session.user.email ?? '')
+        if (!profile) {
+          const meta = session.user.user_metadata
+          await supabase.from('users').upsert({
+            id:                  session.user.id,
+            first_name:          meta?.first_name     ?? '',
+            last_name:           meta?.last_name      ?? '',
+            zip_code:            '',
+            city:                '',
+            state:               '',
+            country:             '',
+            grass_type:          'other',
+            lawn_size_sq_ft:     0,
+            onboarding_complete: false,
+          }, { onConflict: 'id' })
+          profile = await fetchProfile(session.user.id, session.user.email ?? '')
+        }
         if (profile) setUser(profile)
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
@@ -148,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!profile) {
       isNewUser = true
       const meta = data.user.user_metadata
-      const { error: insertError } = await supabase.from('users').insert({
+      const { error: insertError } = await supabase.from('users').upsert({
         id:                  data.user.id,
         first_name:          meta?.first_name ?? '',
         last_name:           meta?.last_name  ?? '',
@@ -159,23 +175,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         grass_type:          'other',
         lawn_size_sq_ft:     0,
         onboarding_complete: false,
-      })
+      }, { onConflict: 'id' })
       if (insertError) throw new Error(insertError.message)
 
-      profile = {
-        id:                 data.user.id,
-        firstName:          meta?.first_name ?? '',
-        lastName:           meta?.last_name  ?? '',
-        email:              data.user.email  ?? '',
-        zipCode:            '',
-        city:               '',
-        state:              '',
-        country:            '',
-        lawnSizeSqFt:       0,
-        grassType:          'other',
-        onboardingComplete: false,
-        createdAt:          data.user.created_at,
-      }
+      profile = await fetchProfile(data.user.id, data.user.email ?? '')
+      if (!profile) throw new Error('Profile was not created. Check your Supabase RLS policies.')
     }
 
     setUser(profile)
