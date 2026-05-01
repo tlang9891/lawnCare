@@ -101,26 +101,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        let profile = await fetchProfile(session.user.id, session.user.email ?? '')
-        if (!profile) {
-          const meta = session.user.user_metadata
-          await supabase.from('users').upsert({
-            id:                  session.user.id,
-            first_name:          meta?.first_name     ?? '',
-            last_name:           meta?.last_name      ?? '',
-            zip_code:            '',
-            city:                '',
-            state:               '',
-            country:             '',
-            grass_type:          'other',
-            lawn_size_sq_ft:     0,
-            onboarding_complete: false,
-          }, { onConflict: 'id' })
-          profile = await fetchProfile(session.user.id, session.user.email ?? '')
-        }
-        if (profile) setUser(profile)
+        const userId    = session.user.id
+        const userEmail = session.user.email ?? ''
+        // Defer DB calls: auth mutex is still held here, and supabase.from() needs
+        // getSession() which re-acquires it — causes a deadlock without the defer.
+        setTimeout(() => {
+          fetchProfile(userId, userEmail).then((profile) => {
+            if (profile) setUser(profile)
+          })
+        }, 0)
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
       }
