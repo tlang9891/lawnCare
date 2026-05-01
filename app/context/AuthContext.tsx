@@ -20,12 +20,13 @@ export interface User {
   email: string
   passwordHash: string   // btoa() encoded, not real crypto
   zipCode: string
-  city?: string
-  state?: string
-  country?: string
+  city: string
+  state: string
+  country: string
   lawnSizeSqFt: number
   grassType: GrassType
   avatarDataUrl?: string | null
+  onboardingComplete: boolean
   createdAt: string
 }
 
@@ -34,6 +35,12 @@ export interface SignupData {
   lastName: string
   email: string
   password: string
+}
+
+export interface OnboardingData {
+  city: string
+  state: string
+  country: string
   zipCode: string
   lawnSizeSqFt: number
   grassType: GrassType
@@ -51,6 +58,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   logout: () => void
   updateProfile: (updates: ProfileUpdates) => void
+  completeOnboarding: (data: OnboardingData) => void
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -88,7 +96,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Hydrate from localStorage on mount (client-only)
   useEffect(() => {
     setUser(readUser())
     setLoading(false)
@@ -106,9 +113,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       lastName: data.lastName.trim(),
       email: data.email.trim().toLowerCase(),
       passwordHash: hashPassword(data.password),
-      zipCode: data.zipCode.trim(),
-      lawnSizeSqFt: data.lawnSizeSqFt,
-      grassType: data.grassType,
+      zipCode: '',
+      city: '',
+      state: '',
+      country: '',
+      lawnSizeSqFt: 0,
+      grassType: 'other',
+      onboardingComplete: false,
       createdAt: new Date().toISOString(),
     }
 
@@ -128,6 +139,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(stored)
   }
 
+  function completeOnboarding(data: OnboardingData): void {
+    if (!user) return
+    const updated: User = {
+      ...user,
+      city: data.city.trim(),
+      state: data.state.trim(),
+      country: data.country.trim(),
+      zipCode: data.zipCode.trim(),
+      lawnSizeSqFt: data.lawnSizeSqFt,
+      grassType: data.grassType,
+      onboardingComplete: true,
+    }
+    writeUser(updated)
+    setUser(updated)
+  }
+
   function updateProfile(updates: ProfileUpdates): void {
     if (!user) return
     const updated = { ...user, ...updates }
@@ -141,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signup, login, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, loading, signup, login, logout, updateProfile, completeOnboarding }}>
       {children}
     </AuthContext.Provider>
   )
