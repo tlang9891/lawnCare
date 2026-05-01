@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
       if (event === 'SIGNED_IN' && session?.user) {
         const profile = await fetchProfile(session.user.id, session.user.email ?? '')
-        setUser(profile)
+        if (profile) setUser(profile)
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
       }
@@ -125,11 +125,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email.trim().toLowerCase(),
       password: data.password,
+      options: {
+        data: {
+          first_name: data.firstName.trim(),
+          last_name:  data.lastName.trim(),
+        },
+      },
     })
     if (authError) throw new Error(authError.message)
     if (!authData.user) throw new Error('Signup failed. Please try again.')
 
-    const { error: profileError } = await supabase.from('users').insert({
+    const { error: insertError } = await supabase.from('users').insert({
       id:                  authData.user.id,
       first_name:          data.firstName.trim(),
       last_name:           data.lastName.trim(),
@@ -137,11 +143,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       city:                '',
       state:               '',
       country:             '',
-      lawn_size_sq_ft:     0,
       grass_type:          'other',
+      lawn_size_sq_ft:     0,
       onboarding_complete: false,
     })
-    if (profileError) throw new Error(profileError.message)
+    if (insertError) throw new Error(insertError.message)
 
     setUser({
       id:                 authData.user.id,
