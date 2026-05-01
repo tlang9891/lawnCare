@@ -117,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             grass_type:          'other',
             lawn_size_sq_ft:     0,
             onboarding_complete: false,
-          }, { onConflict: 'id', ignoreDuplicates: true })
+          }, { onConflict: 'id' })
           profile = await fetchProfile(session.user.id, session.user.email ?? '')
         }
         if (profile) setUser(profile)
@@ -175,23 +175,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         grass_type:          'other',
         lawn_size_sq_ft:     0,
         onboarding_complete: false,
-      }, { onConflict: 'id', ignoreDuplicates: true })
+      }, { onConflict: 'id' })
       if (insertError) throw new Error(insertError.message)
 
-      profile = {
-        id:                 data.user.id,
-        firstName:          meta?.first_name ?? '',
-        lastName:           meta?.last_name  ?? '',
-        email:              data.user.email  ?? '',
-        zipCode:            '',
-        city:               '',
-        state:              '',
-        country:            '',
-        lawnSizeSqFt:       0,
-        grassType:          'other',
-        onboardingComplete: false,
-        createdAt:          data.user.created_at,
-      }
+      profile = await fetchProfile(data.user.id, data.user.email ?? '')
+      if (!profile) throw new Error('Profile was not created. Check your Supabase RLS policies.')
     }
 
     setUser(profile)
