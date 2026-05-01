@@ -1351,6 +1351,9 @@ export default function Dashboard() {
     if (!authLoading && !user) {
       router.push('/login')
     }
+    if (!authLoading && user && !user.onboardingComplete) {
+      router.push('/onboarding')
+    }
   }, [user, authLoading, router])
 
   const lawnKey      = user ? `lawncare-lawn-v2-${user.id}`       : null
