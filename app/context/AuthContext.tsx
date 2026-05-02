@@ -107,10 +107,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userEmail = session.user.email ?? ''
         // Defer DB calls: auth mutex is still held here, and supabase.from() needs
         // getSession() which re-acquires it — causes a deadlock without the defer.
-        setTimeout(() => {
-          fetchProfile(userId, userEmail).then((profile) => {
-            if (profile) setUser(profile)
-          })
+        setTimeout(async () => {
+          let profile = await fetchProfile(userId, userEmail)
+          if (!profile) {
+            // No profile yet — user authenticated via magic link, bypassing verifyOtp.
+            // Create the profile row now using whatever metadata Supabase has.
+            const { data: { user: authUser } } = await supabase.auth.getUser()
+            if (authUser) {
+              const meta = authUser.user_metadata
+              const { error: upsertError } = await supabase.from('users').upsert({
+                id:                  userId,
+                first_name:          meta?.first_name ?? '',
+                last_name:           meta?.last_name  ?? '',
+                zip_code:            '',
+                city:                '',
+                state:               '',
+                country:             '',
+                grass_type:          'other',
+                lawn_size_sq_ft:     0,
+                onboarding_complete: false,
+              }, { onConflict: 'id' })
+              if (!upsertError) {
+                profile = await fetchProfile(userId, userEmail)
+              }
+            }
+          }
+          if (profile) setUser(profile)
         }, 0)
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
