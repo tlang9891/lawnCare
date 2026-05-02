@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { isCanadianPostal } from '@/app/lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -44,9 +45,6 @@ interface GeoResponse {
   results?: GeoResult[]
 }
 
-function isCanadianPostal(code: string): boolean {
-  return /^[A-Za-z]\d[A-Za-z]/i.test(code.trim())
-}
 
 interface GeoPoint { lat: number; lng: number; locationName: string }
 
