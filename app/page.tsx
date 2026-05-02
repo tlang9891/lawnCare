@@ -9,6 +9,7 @@ import LawnPhotoGallery, { LawnPhoto } from './components/LawnPhotoGallery'
 
 import { getStatus, formatDate, formatDateLong, daysUntil, addDays } from '@/app/lib/utils'
 import type { Status } from '@/app/lib/utils'
+import MowerMakeModelPicker from '@/app/components/MowerMakeModelPicker'
 
 type ActivityType  = 'watering' | 'mowing' | 'fertilizing'
 type EquipmentType = 'mower' | 'blower' | 'trimmer' | 'edger' | 'chainsaw' | 'pressure_washer' | 'other'
@@ -636,21 +637,30 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
             </div>
           )}
 
-          {/* Make + Model side by side */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Make <span className="text-red-400">*</span></label>
-              <input type="text" value={make} placeholder="e.g. John Deere"
-                onChange={(e) => setMake(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+          {/* Make + Model */}
+          {equipType === 'mower' ? (
+            <MowerMakeModelPicker
+              make={make}
+              model={model}
+              onMakeChange={(v) => { setMake(v); setModel('') }}
+              onModelChange={setModel}
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Make <span className="text-red-400">*</span></label>
+                <input type="text" value={make} placeholder="e.g. Craftsman"
+                  onChange={(e) => setMake(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Model <span className="text-red-400">*</span></label>
+                <input type="text" value={model} placeholder="e.g. BV428"
+                  onChange={(e) => setModel(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Model <span className="text-red-400">*</span></label>
-              <input type="text" value={model} placeholder="e.g. X350"
-                onChange={(e) => setModel(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
-            </div>
-          </div>
+          )}
 
           {/* Year */}
           <div>
@@ -912,20 +922,29 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
           )}
 
           {/* Make + Model */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Make <span className="text-red-400">*</span></label>
-              <input type="text" value={make} placeholder="e.g. John Deere"
-                onChange={(e) => setMake(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+          {equipType === 'mower' ? (
+            <MowerMakeModelPicker
+              make={make}
+              model={model}
+              onMakeChange={(v) => { setMake(v); setModel('') }}
+              onModelChange={setModel}
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Make <span className="text-red-400">*</span></label>
+                <input type="text" value={make} placeholder="e.g. Craftsman"
+                  onChange={(e) => setMake(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Model <span className="text-red-400">*</span></label>
+                <input type="text" value={model} placeholder="e.g. BV428"
+                  onChange={(e) => setModel(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Model <span className="text-red-400">*</span></label>
-              <input type="text" value={model} placeholder="e.g. X350"
-                onChange={(e) => setModel(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
-            </div>
-          </div>
+          )}
 
           {/* Year */}
           <div>
