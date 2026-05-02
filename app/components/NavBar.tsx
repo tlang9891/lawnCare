@@ -31,7 +31,7 @@ export default function NavBar() {
           <div className="flex items-center gap-3">
             <Link
               href="/profile"
-              className="text-green-700 text-sm font-medium hidden sm:block hover:text-green-900 transition-colors"
+              className="text-green-700 text-sm font-medium hover:text-green-900 transition-colors"
             >
               {user.firstName} {user.lastName}
             </Link>
