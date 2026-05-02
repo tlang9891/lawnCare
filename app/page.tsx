@@ -7,8 +7,10 @@ import WeatherWidget from './components/WeatherWidget'
 import LawnCalendar from './components/LawnCalendar'
 import LawnPhotoGallery, { LawnPhoto } from './components/LawnPhotoGallery'
 
+import { getStatus, formatDate, formatDateLong, daysUntil, addDays } from '@/app/lib/utils'
+import type { Status } from '@/app/lib/utils'
+
 type ActivityType  = 'watering' | 'mowing' | 'fertilizing'
-type Status        = 'on_track' | 'due_soon' | 'overdue' | 'never'
 type EquipmentType = 'mower' | 'blower' | 'trimmer' | 'edger' | 'chainsaw' | 'pressure_washer' | 'other'
 
 interface ActivityLog {
@@ -130,42 +132,6 @@ const MAINTENANCE_DEFAULTS: Record<EquipmentType, { name: string; intervalMonths
 
 function todayStr(): string {
   return new Date().toISOString().split('T')[0]
-}
-
-function getStatus(nextDate: string | null): Status {
-  if (!nextDate) return 'never'
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  const next = new Date(nextDate + 'T00:00:00')
-  const diff = Math.ceil((next.getTime() - now.getTime()) / 86400000)
-  if (diff < 0) return 'overdue'
-  if (diff <= 2) return 'due_soon'
-  return 'on_track'
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function formatDateLong(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })
-}
-
-function daysUntil(dateStr: string | null): number | null {
-  if (!dateStr) return null
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  const next = new Date(dateStr + 'T00:00:00')
-  return Math.ceil((next.getTime() - now.getTime()) / 86400000)
-}
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + days)
-  return d.toISOString().split('T')[0]
 }
 
 function getMaintenanceStatus(item: MaintenanceItem): Status {
