@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/context/AuthContext'
 import type { GrassType } from '@/app/context/AuthContext'
+import MowerMakeModelPicker from '@/app/components/MowerMakeModelPicker'
 
 type Step = 1 | 2 | 3
 
@@ -163,9 +164,6 @@ function Step2Mower({ mower, setMower, onNext, onBack }: {
     return Object.keys(next).length === 0
   }
 
-  const inputClass = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent'
-  const labelClass = 'block text-sm font-medium text-gray-700 mb-1.5'
-
   return (
     <div className="space-y-5">
       <div>
@@ -175,24 +173,17 @@ function Step2Mower({ mower, setMower, onNext, onBack }: {
 
       {!mower.skip && (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelClass}>Make</label>
-              <input type="text" value={mower.make}
-                onChange={(e) => setMower({ ...mower, make: e.target.value })}
-                placeholder="e.g. John Deere" className={inputClass} />
-              {errors.make && <p className="mt-1.5 text-xs text-red-500">{errors.make}</p>}
-            </div>
-            <div>
-              <label className={labelClass}>Model</label>
-              <input type="text" value={mower.model}
-                onChange={(e) => setMower({ ...mower, model: e.target.value })}
-                placeholder="e.g. X350" className={inputClass} />
-              {errors.model && <p className="mt-1.5 text-xs text-red-500">{errors.model}</p>}
-            </div>
-          </div>
+          <MowerMakeModelPicker
+            make={mower.make}
+            model={mower.model}
+            onMakeChange={(v) => setMower({ ...mower, make: v, model: '' })}
+            onModelChange={(v) => setMower({ ...mower, model: v })}
+            makeError={errors.make}
+            modelError={errors.model}
+            showRequiredMark={false}
+          />
           <div>
-            <label className={labelClass}>Mower Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Mower Type</label>
             <div className="grid grid-cols-2 gap-2">
               {(['riding', 'push'] as const).map((t) => (
                 <button key={t} type="button" onClick={() => setMower({ ...mower, subType: t })}
