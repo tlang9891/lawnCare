@@ -1,0 +1,22 @@
+{
+  "watering": {
+    "logs": [
+      { "date": "2026-05-01", "duration": 30 },
+      { "date": "2026-04-28", "duration": 45 }
+    ],
+    "nextRecommended": "2026-05-04",
+    "intervalDays": 3
+  },
+  "mowing": {
+    "logs": [
+      { "date": "2026-04-25" }
+    ],
+    "nextRecommended": "2026-05-05",
+    "intervalDays": 10
+  },
+  "fertilizing": {
+    "logs": [],
+    "nextRecommended": null,
+    "intervalDays": 60
+  }
+}

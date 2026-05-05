@@ -9,7 +9,10 @@
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "cy:run:headless": "cypress run --headless --browser electron"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.1",
@@ -26,6 +29,7 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "cypress": "^15.14.2",
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
     "jest": "^30.3.0",
