@@ -1,0 +1,21 @@
+[
+  {
+    "id": "equip-001",
+    "type": "mower",
+    "mowerSubType": "push",
+    "year": "2022",
+    "make": "Honda",
+    "model": "HRX217VKA",
+    "purchaseDate": "2022-03-15",
+    "purchaseLocation": "Home Depot",
+    "receiptDataUrl": null,
+    "photoDataUrl": null,
+    "maintenance": [
+      { "id": "maint-001", "name": "Oil Change",            "logDates": ["2025-11-01"], "intervalMonths": 6  },
+      { "id": "maint-002", "name": "Blade Sharpen/Replace", "logDates": [],             "intervalMonths": 6  },
+      { "id": "maint-003", "name": "Air Filter Replace",    "logDates": [],             "intervalMonths": 6  },
+      { "id": "maint-004", "name": "Spark Plug Replace",    "logDates": [],             "intervalMonths": 12 },
+      { "id": "maint-005", "name": "Fuel Filter Replace",   "logDates": [],             "intervalMonths": 12 }
+    ]
+  }
+]

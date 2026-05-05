@@ -1,0 +1,5 @@
+{
+  "watering":    { "logs": [], "nextRecommended": null, "intervalDays": 3  },
+  "mowing":      { "logs": [], "nextRecommended": null, "intervalDays": 10 },
+  "fertilizing": { "logs": [], "nextRecommended": null, "intervalDays": 60 }
+}
