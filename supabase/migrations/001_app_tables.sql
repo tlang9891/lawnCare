@@ -1,6 +1,15 @@
+-- Drop in reverse dependency order so FK constraints don't block the drops
+drop table if exists maintenance_logs  cascade;
+drop table if exists maintenance_items cascade;
+drop table if exists equipment         cascade;
+drop table if exists lawn_activities   cascade;
+drop table if exists lawn_settings     cascade;
+drop table if exists scheduled_tasks   cascade;
+drop table if exists lawn_photos       cascade;
+
 -- ── Lawn activity settings (interval & next scheduled date, one row per user per type) ──
 
-create table if not exists lawn_settings (
+create table lawn_settings (
   id               uuid        default gen_random_uuid() primary key,
   user_id          uuid        references users(id) on delete cascade not null,
   activity_type    text        not null check (activity_type in ('watering', 'mowing', 'fertilizing')),
@@ -15,7 +24,7 @@ create policy "Users manage own lawn_settings"
 
 -- ── Lawn activity log entries ────────────────────────────────────────────────
 
-create table if not exists lawn_activities (
+create table lawn_activities (
   id               uuid        default gen_random_uuid() primary key,
   user_id          uuid        references users(id) on delete cascade not null,
   activity_type    text        not null check (activity_type in ('watering', 'mowing', 'fertilizing')),
@@ -29,7 +38,7 @@ create policy "Users manage own lawn_activities"
 
 -- ── Equipment records ────────────────────────────────────────────────────────
 
-create table if not exists equipment (
+create table equipment (
   id                uuid        default gen_random_uuid() primary key,
   user_id           uuid        references users(id) on delete cascade not null,
   type              text        not null,
@@ -49,7 +58,7 @@ create policy "Users manage own equipment"
 
 -- ── Maintenance task templates (one per maintenance task per piece of equipment) ──
 
-create table if not exists maintenance_items (
+create table maintenance_items (
   id              uuid        default gen_random_uuid() primary key,
   equipment_id    uuid        references equipment(id) on delete cascade not null,
   user_id         uuid        references users(id) on delete cascade not null,
@@ -63,7 +72,7 @@ create policy "Users manage own maintenance_items"
 
 -- ── Maintenance log entries (when each task was completed) ───────────────────
 
-create table if not exists maintenance_logs (
+create table maintenance_logs (
   id                  uuid        default gen_random_uuid() primary key,
   maintenance_item_id uuid        references maintenance_items(id) on delete cascade not null,
   user_id             uuid        references users(id) on delete cascade not null,
@@ -76,7 +85,7 @@ create policy "Users manage own maintenance_logs"
 
 -- ── Scheduled calendar tasks ─────────────────────────────────────────────────
 
-create table if not exists scheduled_tasks (
+create table scheduled_tasks (
   id         uuid        default gen_random_uuid() primary key,
   user_id    uuid        references users(id) on delete cascade not null,
   type       text        not null check (type in ('watering', 'mowing', 'fertilizing')),
@@ -90,7 +99,7 @@ create policy "Users manage own scheduled_tasks"
 
 -- ── Lawn photo metadata (files stored in Supabase Storage) ───────────────────
 
-create table if not exists lawn_photos (
+create table lawn_photos (
   id          uuid        default gen_random_uuid() primary key,
   user_id     uuid        references users(id) on delete cascade not null,
   url         text        not null,
@@ -103,19 +112,10 @@ create policy "Users manage own lawn_photos"
   on lawn_photos for all using (auth.uid() = user_id);
 
 -- ── Storage buckets ───────────────────────────────────────────────────────────
--- Run these separately in the Supabase Storage section of the dashboard,
--- or via the Storage API. The SQL editor does not create buckets directly.
+-- Create these manually in Supabase dashboard → Storage → New bucket:
+--   • equipment-media  (private)
+--   • lawn-photos      (private)
 --
--- Bucket: equipment-media  (private, for equipment photos & receipts)
--- Bucket: lawn-photos      (private, for lawn gallery photos)
---
--- Storage RLS policies (add under Storage > Policies):
---
--- For equipment-media:
---   Allow select: (auth.uid()::text = (storage.foldername(name))[1])
---   Allow insert: (auth.uid()::text = (storage.foldername(name))[1])
---   Allow update: (auth.uid()::text = (storage.foldername(name))[1])
---   Allow delete: (auth.uid()::text = (storage.foldername(name))[1])
---
--- For lawn-photos:
---   Same pattern as above.
+-- Then add a policy on each bucket under Storage → Policies → New policy:
+--   Allowed operation: ALL
+--   Policy definition: (auth.uid()::text = (storage.foldername(name))[1])
