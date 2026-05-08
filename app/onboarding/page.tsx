@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/app/context/AuthContext'
 import type { GrassType } from '@/app/context/AuthContext'
 import MowerMakeModelPicker from '@/app/components/MowerMakeModelPicker'
+import { addEquipment } from '@/app/lib/db'
 
 type Step = 1 | 2 | 3
 
@@ -328,27 +329,20 @@ export default function OnboardingPage() {
       await completeOnboarding({ city, state, country, zipCode, lawnSizeSqFt: Number(lawnSize), grassType })
 
       if (!mower.skip && mower.make.trim() && mower.model.trim()) {
-        const equipKey = `lawncare-equipment-v2-${user.id}`
-        const existing = (() => { try { return JSON.parse(localStorage.getItem(equipKey) ?? '[]') } catch { return [] } })()
-        const newMower = {
-          id: Date.now().toString(),
-          type: 'mower',
-          mowerSubType: mower.subType ?? undefined,
-          year: new Date().getFullYear().toString(),
-          make: mower.make.trim(),
-          model: mower.model.trim(),
-          purchaseDate: null,
-          purchaseLocation: '',
-          receiptDataUrl: null,
-          photoDataUrl: null,
-          maintenance: MOWER_MAINTENANCE_DEFAULTS.map((m, i) => ({
-            id: `${Date.now()}-${i}`,
-            name: m.name,
-            logDates: [],
-            intervalMonths: m.intervalMonths,
-          })),
-        }
-        localStorage.setItem(equipKey, JSON.stringify([...existing, newMower]))
+        await addEquipment(
+          user.id,
+          'mower',
+          {
+            mowerSubType:     mower.subType ?? undefined,
+            year:             new Date().getFullYear().toString(),
+            make:             mower.make.trim(),
+            model:            mower.model.trim(),
+            purchaseDate:     null,
+            purchaseLocation: '',
+          },
+          null,
+          null,
+        )
       }
 
       router.push('/')
