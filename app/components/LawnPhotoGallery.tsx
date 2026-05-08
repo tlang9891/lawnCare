@@ -1,13 +1,9 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import type { LawnPhoto } from '@/app/lib/types'
 
-export interface LawnPhoto {
-  id: string
-  dataUrl: string
-  capturedAt: string
-  caption: string
-}
+export type { LawnPhoto }
 
 function CloseIcon() {
   return (
@@ -55,8 +51,8 @@ function formatCapturedAt(iso: string): string {
 }
 
 interface LightboxProps {
-  photo: LawnPhoto
-  onClose: () => void
+  photo:    LawnPhoto
+  onClose:  () => void
   onDelete: () => void
 }
 
@@ -73,7 +69,7 @@ function Lightbox({ photo, onClose, onDelete }: LightboxProps) {
           <CloseIcon />
         </button>
         <img
-          src={photo.dataUrl}
+          src={photo.url}
           alt={photo.caption || 'Lawn photo'}
           className="w-full rounded-2xl shadow-2xl max-h-[70vh] object-contain"
         />
@@ -115,35 +111,44 @@ function Lightbox({ photo, onClose, onDelete }: LightboxProps) {
 
 interface AddPhotoModalProps {
   onClose: () => void
-  onSave: (photo: Omit<LawnPhoto, 'id'>) => void
+  onSave:  (file: File, caption: string) => Promise<void>
 }
 
 function AddPhotoModal({ onClose, onSave }: AddPhotoModalProps) {
-  const [dataUrl, setDataUrl]     = useState<string | null>(null)
-  const [caption, setCaption]     = useState('')
-  const [error, setError]         = useState('')
+  const [file, setFile]       = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [caption, setCaption] = useState('')
+  const [error, setError]     = useState('')
+  const [saving, setSaving]   = useState(false)
   const galleryRef = useRef<HTMLInputElement>(null)
   const cameraRef  = useRef<HTMLInputElement>(null)
 
-  function handleFile(file: File) {
+  function handleFile(f: File) {
     setError('')
-    if (file.size > 5 * 1024 * 1024) {
+    if (f.size > 5 * 1024 * 1024) {
       setError('Photo must be under 5 MB.')
       return
     }
+    setFile(f)
     const reader = new FileReader()
-    reader.onload = (e) => setDataUrl(e.target?.result as string)
-    reader.readAsDataURL(file)
+    reader.onload = (e) => setPreview(e.target?.result as string)
+    reader.readAsDataURL(f)
   }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) handleFile(file)
+    const f = e.target.files?.[0]
+    if (f) handleFile(f)
   }
 
-  function handleSave() {
-    if (!dataUrl) return
-    onSave({ dataUrl, caption: caption.trim(), capturedAt: new Date().toISOString() })
+  async function handleSave() {
+    if (!file || saving) return
+    setSaving(true)
+    try {
+      await onSave(file, caption.trim())
+    } catch {
+      setError('Upload failed. Please try again.')
+      setSaving(false)
+    }
   }
 
   return (
@@ -158,15 +163,14 @@ function AddPhotoModal({ onClose, onSave }: AddPhotoModalProps) {
         </div>
 
         <div className="px-5 py-5 space-y-4">
-          {/* hidden inputs */}
           <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={handleInputChange} />
           <input ref={cameraRef}  type="file" accept="image/*" capture="environment" className="hidden" onChange={handleInputChange} />
 
-          {dataUrl ? (
+          {preview ? (
             <div className="relative rounded-xl overflow-hidden">
-              <img src={dataUrl} alt="Preview" className="w-full max-h-52 object-cover rounded-xl" />
+              <img src={preview} alt="Preview" className="w-full max-h-52 object-cover rounded-xl" />
               <button
-                onClick={() => setDataUrl(null)}
+                onClick={() => { setFile(null); setPreview(null) }}
                 className="absolute top-2 right-2 w-7 h-7 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white transition-colors"
               >
                 <CloseIcon />
@@ -211,10 +215,10 @@ function AddPhotoModal({ onClose, onSave }: AddPhotoModalProps) {
           </button>
           <button
             onClick={handleSave}
-            disabled={!dataUrl}
+            disabled={!file || saving}
             className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed rounded-xl text-sm font-semibold text-white transition-colors"
           >
-            Save Photo
+            {saving ? 'Saving…' : 'Save Photo'}
           </button>
         </div>
       </div>
@@ -223,17 +227,17 @@ function AddPhotoModal({ onClose, onSave }: AddPhotoModalProps) {
 }
 
 interface LawnPhotoGalleryProps {
-  photos: LawnPhoto[]
-  onAdd: (photo: Omit<LawnPhoto, 'id'>) => void
+  photos:   LawnPhoto[]
+  onAdd:    (file: File, caption: string) => Promise<void>
   onDelete: (id: string) => void
 }
 
 export default function LawnPhotoGallery({ photos, onAdd, onDelete }: LawnPhotoGalleryProps) {
-  const [showAdd, setShowAdd]         = useState(false)
-  const [lightbox, setLightbox]       = useState<LawnPhoto | null>(null)
+  const [showAdd, setShowAdd]   = useState(false)
+  const [lightbox, setLightbox] = useState<LawnPhoto | null>(null)
 
-  function handleAdd(photo: Omit<LawnPhoto, 'id'>) {
-    onAdd(photo)
+  async function handleAdd(file: File, caption: string) {
+    await onAdd(file, caption)
     setShowAdd(false)
   }
 
@@ -278,7 +282,7 @@ export default function LawnPhotoGallery({ photos, onAdd, onDelete }: LawnPhotoG
               className="relative aspect-square rounded-2xl overflow-hidden bg-gray-100 group focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <img
-                src={photo.dataUrl}
+                src={photo.url}
                 alt={photo.caption || 'Lawn photo'}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
               />

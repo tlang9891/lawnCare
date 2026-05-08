@@ -5,63 +5,18 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from './context/AuthContext'
 import WeatherWidget from './components/WeatherWidget'
 import LawnCalendar from './components/LawnCalendar'
-import LawnPhotoGallery, { LawnPhoto } from './components/LawnPhotoGallery'
+import LawnPhotoGallery from './components/LawnPhotoGallery'
+import type { LawnPhoto } from './components/LawnPhotoGallery'
 
 import { getStatus, formatDate, formatDateLong, daysUntil, addDays } from '@/app/lib/utils'
 import type { Status } from '@/app/lib/utils'
 import MowerMakeModelPicker from '@/app/components/MowerMakeModelPicker'
-
-type ActivityType  = 'watering' | 'mowing' | 'fertilizing'
-type EquipmentType = 'mower' | 'blower' | 'trimmer' | 'edger' | 'chainsaw' | 'pressure_washer' | 'other'
-
-interface ActivityLog {
-  date: string
-  duration?: number
-}
-
-interface Activity {
-  logs: ActivityLog[]        // most-recent first
-  nextRecommended: string | null
-  intervalDays: number
-}
-
-interface LawnData {
-  watering:    Activity
-  mowing:      Activity
-  fertilizing: Activity
-}
-
-interface MaintenanceItem {
-  id: string
-  name: string
-  logDates: string[]         // most-recent first
-  intervalMonths: number
-}
-interface Equipment {
-  id: string
-  type: EquipmentType
-  mowerSubType?: 'riding' | 'push'
-  year: string
-  make: string
-  model: string
-  purchaseDate: string | null
-  purchaseLocation: string
-  receiptDataUrl: string | null
-  photoDataUrl: string | null
-  maintenance: MaintenanceItem[]
-}
-
-interface HistoryEntry {
-  date: string
-  detail?: string
-}
-
-interface ScheduledTask {
-  id: string
-  type: 'watering' | 'mowing' | 'fertilizing'
-  date: string
-  note?: string
-}
+import * as db from '@/app/lib/db'
+import type {
+  ActivityType, ActivityLog, Activity, LawnData,
+  EquipmentType, MaintenanceItem, Equipment,
+  ScheduledTask,
+} from '@/app/lib/types'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -87,11 +42,11 @@ const EQUIPMENT_OPTIONS: { value: EquipmentType; label: string }[] = [
 
 const MAINTENANCE_DEFAULTS: Record<EquipmentType, { name: string; intervalMonths: number }[]> = {
   mower: [
-    { name: 'Oil Change',           intervalMonths: 6  },
-    { name: 'Blade Sharpen/Replace',intervalMonths: 6  },
-    { name: 'Air Filter Replace',   intervalMonths: 6  },
-    { name: 'Spark Plug Replace',   intervalMonths: 12 },
-    { name: 'Fuel Filter Replace',  intervalMonths: 12 },
+    { name: 'Oil Change',            intervalMonths: 6  },
+    { name: 'Blade Sharpen/Replace', intervalMonths: 6  },
+    { name: 'Air Filter Replace',    intervalMonths: 6  },
+    { name: 'Spark Plug Replace',    intervalMonths: 12 },
+    { name: 'Fuel Filter Replace',   intervalMonths: 12 },
   ],
   blower: [
     { name: 'Air Filter Clean',     intervalMonths: 3  },
@@ -107,17 +62,17 @@ const MAINTENANCE_DEFAULTS: Record<EquipmentType, { name: string; intervalMonths
     { name: 'Fuel Filter Replace',  intervalMonths: 12 },
   ],
   edger: [
-    { name: 'Blade Sharpen/Replace',intervalMonths: 6  },
-    { name: 'Air Filter Replace',   intervalMonths: 6  },
-    { name: 'Spark Plug Replace',   intervalMonths: 12 },
-    { name: 'Fuel Filter Replace',  intervalMonths: 12 },
+    { name: 'Blade Sharpen/Replace', intervalMonths: 6  },
+    { name: 'Air Filter Replace',    intervalMonths: 6  },
+    { name: 'Spark Plug Replace',    intervalMonths: 12 },
+    { name: 'Fuel Filter Replace',   intervalMonths: 12 },
   ],
   chainsaw: [
-    { name: 'Bar & Chain Oil',      intervalMonths: 1  },
-    { name: 'Chain Sharpen',        intervalMonths: 3  },
-    { name: 'Air Filter Clean',     intervalMonths: 3  },
-    { name: 'Fuel Filter Replace',  intervalMonths: 6  },
-    { name: 'Spark Plug Replace',   intervalMonths: 12 },
+    { name: 'Bar & Chain Oil',    intervalMonths: 1  },
+    { name: 'Chain Sharpen',       intervalMonths: 3  },
+    { name: 'Air Filter Clean',    intervalMonths: 3  },
+    { name: 'Fuel Filter Replace', intervalMonths: 6  },
+    { name: 'Spark Plug Replace',  intervalMonths: 12 },
   ],
   pressure_washer: [
     { name: 'Nozzle Inspect/Clean', intervalMonths: 3  },
@@ -153,15 +108,13 @@ function getMaintenanceNextDate(item: MaintenanceItem): string | null {
   return next.toISOString().split('T')[0]
 }
 
-// ── Default data ──────────────────────────────────────────────────────────────
+// ── Default lawn data ─────────────────────────────────────────────────────────
 
 const DEFAULT_LAWN: LawnData = {
   watering:    { logs: [], nextRecommended: null, intervalDays: 3  },
   mowing:      { logs: [], nextRecommended: null, intervalDays: 10 },
   fertilizing: { logs: [], nextRecommended: null, intervalDays: 60 },
 }
-
-const DEFAULT_EQUIPMENT: Equipment[] = []
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 
@@ -360,12 +313,12 @@ function TipsModal({ type, onClose }: { type: ActivityType; onClose: () => void 
 // ── CareCard ──────────────────────────────────────────────────────────────────
 
 interface CareCardProps {
-  title: string
-  icon: React.ReactNode
-  activity: Activity
-  onLog: () => void
-  onHistory: () => void
-  onTip: () => void
+  title:       string
+  icon:        React.ReactNode
+  activity:    Activity
+  onLog:       () => void
+  onHistory:   () => void
+  onTip:       () => void
   accentColor: string
 }
 
@@ -449,13 +402,18 @@ function CareCard({ title, icon, activity, onLog, onHistory, onTip, accentColor 
 
 // ── History Modal ─────────────────────────────────────────────────────────────
 
+interface HistoryEntry {
+  date:    string
+  detail?: string
+}
+
 function HistoryModal({
   title, entries, dotColor, onClose,
 }: {
-  title: string
-  entries: HistoryEntry[]
+  title:    string
+  entries:  HistoryEntry[]
   dotColor: string
-  onClose: () => void
+  onClose:  () => void
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -495,7 +453,12 @@ function HistoryModal({
 
 // ── Add Equipment Modal ───────────────────────────────────────────────────────
 
-function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (e: Equipment) => void }) {
+function AddEquipmentModal({
+  onClose, onSave,
+}: {
+  onClose: () => void
+  onSave:  (type: EquipmentType, fields: Omit<Equipment, 'id' | 'type' | 'maintenance' | 'photoUrl' | 'receiptUrl'>, photoFile: File | null, receiptFile: File | null) => Promise<void>
+}) {
   const [equipType, setEquipType]               = useState<EquipmentType>('mower')
   const [mowerSubType, setMowerSubType]         = useState<'riding' | 'push' | null>(null)
   const [make, setMake]                         = useState('')
@@ -503,12 +466,19 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
   const [year, setYear]                         = useState(new Date().getFullYear().toString())
   const [purchaseDate, setPurchaseDate]         = useState('')
   const [purchaseLocation, setPurchaseLocation] = useState('')
-  const [photoDataUrl, setPhotoDataUrl]         = useState<string | null>(null)
-  const [photoName, setPhotoName]               = useState<string | null>(null)
-  const [photoError, setPhotoError]             = useState('')
-  const [receiptDataUrl, setReceiptDataUrl]     = useState<string | null>(null)
-  const [receiptName, setReceiptName]           = useState<string | null>(null)
-  const [fileError, setFileError]               = useState('')
+
+  const [photoFile, setPhotoFile]       = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoName, setPhotoName]       = useState<string | null>(null)
+  const [photoError, setPhotoError]     = useState('')
+
+  const [receiptFile, setReceiptFile]       = useState<File | null>(null)
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
+  const [receiptName, setReceiptName]       = useState<string | null>(null)
+  const [fileError, setFileError]           = useState('')
+
+  const [saving, setSaving] = useState(false)
+
   const photoRef = useRef<HTMLInputElement>(null)
   const fileRef  = useRef<HTMLInputElement>(null)
 
@@ -521,14 +491,16 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
       e.target.value = ''
       return
     }
+    setPhotoFile(file)
     setPhotoName(file.name)
     const reader = new FileReader()
-    reader.onload = (ev) => setPhotoDataUrl(ev.target?.result as string)
+    reader.onload = (ev) => setPhotoPreview(ev.target?.result as string)
     reader.readAsDataURL(file)
   }
 
   function removePhoto() {
-    setPhotoDataUrl(null)
+    setPhotoFile(null)
+    setPhotoPreview(null)
     setPhotoName(null)
     setPhotoError('')
     if (photoRef.current) photoRef.current.value = ''
@@ -543,43 +515,44 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
       e.target.value = ''
       return
     }
+    setReceiptFile(file)
     setReceiptName(file.name)
     const reader = new FileReader()
-    reader.onload = (ev) => setReceiptDataUrl(ev.target?.result as string)
+    reader.onload = (ev) => setReceiptPreview(ev.target?.result as string)
     reader.readAsDataURL(file)
   }
 
   function removeReceipt() {
-    setReceiptDataUrl(null)
+    setReceiptFile(null)
+    setReceiptPreview(null)
     setReceiptName(null)
     setFileError('')
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  function handleSave() {
-    const defaults = MAINTENANCE_DEFAULTS[equipType]
-    const maintenance: MaintenanceItem[] = defaults.map((m, i) => ({
-      id: `${Date.now()}-${i}`,
-      name: m.name,
-      logDates: [],
-      intervalMonths: m.intervalMonths,
-    }))
-    onSave({
-      id: Date.now().toString(),
-      type: equipType,
-      mowerSubType: equipType === 'mower' ? (mowerSubType ?? undefined) : undefined,
-      year: year.trim() || new Date().getFullYear().toString(),
-      make: make.trim(),
-      model: model.trim(),
-      purchaseDate: purchaseDate || null,
-      purchaseLocation: purchaseLocation.trim(),
-      receiptDataUrl,
-      photoDataUrl,
-      maintenance,
-    })
+  async function handleSave() {
+    if (saving) return
+    setSaving(true)
+    try {
+      await onSave(
+        equipType,
+        {
+          mowerSubType:     equipType === 'mower' ? (mowerSubType ?? undefined) : undefined,
+          year:             year.trim() || new Date().getFullYear().toString(),
+          make:             make.trim(),
+          model:            model.trim(),
+          purchaseDate:     purchaseDate || null,
+          purchaseLocation: purchaseLocation.trim(),
+        },
+        photoFile,
+        receiptFile,
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const canSave = make.trim().length > 0 && model.trim().length > 0
+  const canSave  = make.trim().length > 0 && model.trim().length > 0
   const defaults = MAINTENANCE_DEFAULTS[equipType]
 
   return (
@@ -587,7 +560,6 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[92vh]">
 
-        {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-base font-bold text-gray-900">Add Equipment</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
@@ -595,10 +567,8 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
           </button>
         </div>
 
-        {/* Scrollable form */}
         <div className="overflow-y-auto flex-1 px-5 py-5 space-y-4">
 
-          {/* Equipment type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Equipment Type</label>
             <div className="relative">
@@ -618,7 +588,6 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
             </div>
           </div>
 
-          {/* Mower sub-type */}
           {equipType === 'mower' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Mower Type</label>
@@ -637,7 +606,6 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
             </div>
           )}
 
-          {/* Make + Model */}
           {equipType === 'mower' ? (
             <MowerMakeModelPicker
               make={make}
@@ -662,7 +630,6 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
             </div>
           )}
 
-          {/* Year */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Year</label>
             <input type="number" value={year} min="1990" max={new Date().getFullYear()}
@@ -670,10 +637,8 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
           </div>
 
-          {/* Divider */}
           <div className="border-t border-gray-100" />
 
-          {/* Purchase Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Date of Purchase</label>
             <input type="date" value={purchaseDate} max={todayStr()}
@@ -681,7 +646,6 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
           </div>
 
-          {/* Purchase Location */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Purchase Location</label>
             <input type="text" value={purchaseLocation} placeholder="e.g. Home Depot, Dealer Name"
@@ -689,13 +653,12 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
           </div>
 
-          {/* Photo upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Equipment Photo</label>
             <input ref={photoRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
-            {photoDataUrl ? (
+            {photoPreview ? (
               <div className="border border-gray-200 rounded-xl p-3 flex items-center gap-3">
-                <img src={photoDataUrl} alt="Equipment preview" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
+                <img src={photoPreview} alt="Equipment preview" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-700 truncate">{photoName}</p>
                   <button onClick={removePhoto} className="text-xs text-red-500 hover:text-red-600 font-medium">Remove</button>
@@ -714,14 +677,13 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
             {photoError && <p className="text-xs text-red-500 mt-1.5">{photoError}</p>}
           </div>
 
-          {/* Receipt upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Receipt</label>
             <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={handleFileChange} className="hidden" />
-            {receiptDataUrl ? (
+            {receiptPreview ? (
               <div className="border border-gray-200 rounded-xl p-3 flex items-center gap-3">
-                {receiptDataUrl.startsWith('data:image') ? (
-                  <img src={receiptDataUrl} alt="Receipt preview" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
+                {receiptFile?.type !== 'application/pdf' ? (
+                  <img src={receiptPreview} alt="Receipt preview" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
                 ) : (
                   <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 text-gray-400">
                     <ReceiptIcon />
@@ -745,7 +707,6 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
             {fileError && <p className="text-xs text-red-500 mt-1.5">{fileError}</p>}
           </div>
 
-          {/* Maintenance preview */}
           {defaults.length > 0 && (
             <div className="bg-green-50 rounded-xl p-4">
               <p className="text-xs font-bold text-green-700 mb-2 uppercase tracking-wide">Maintenance tracking included</p>
@@ -756,9 +717,7 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
                       <span className="w-1 h-1 rounded-full bg-green-400 flex-shrink-0" />
                       {m.name}
                     </span>
-                    <span className="text-green-500 font-medium">
-                      Every {m.intervalMonths} mo
-                    </span>
+                    <span className="text-green-500 font-medium">Every {m.intervalMonths} mo</span>
                   </li>
                 ))}
               </ul>
@@ -766,15 +725,14 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
           )}
         </div>
 
-        {/* Footer */}
         <div className="px-5 pb-5 pt-4 border-t border-gray-100 flex-shrink-0 flex gap-3">
           <button onClick={onClose}
             className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={!canSave}
+          <button onClick={handleSave} disabled={!canSave || saving}
             className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed rounded-xl text-sm font-semibold text-white transition-colors">
-            Add to Shed
+            {saving ? 'Saving…' : 'Add to Shed'}
           </button>
         </div>
       </div>
@@ -786,8 +744,8 @@ function AddEquipmentModal({ onClose, onSave }: { onClose: () => void; onSave: (
 
 function EditEquipmentModal({ equipment, onClose, onSave }: {
   equipment: Equipment
-  onClose: () => void
-  onSave: (updated: Equipment) => void
+  onClose:   () => void
+  onSave:    (updated: Equipment, photoFile: File | null, receiptFile: File | null) => Promise<void>
 }) {
   const [equipType, setEquipType]               = useState<EquipmentType>(equipment.type)
   const [mowerSubType, setMowerSubType]         = useState<'riding' | 'push' | null>(equipment.mowerSubType ?? null)
@@ -796,12 +754,22 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
   const [year, setYear]                         = useState(equipment.year)
   const [purchaseDate, setPurchaseDate]         = useState(equipment.purchaseDate ?? '')
   const [purchaseLocation, setPurchaseLocation] = useState(equipment.purchaseLocation)
-  const [photoDataUrl, setPhotoDataUrl]         = useState<string | null>(equipment.photoDataUrl ?? null)
-  const [photoName, setPhotoName]               = useState<string | null>(equipment.photoDataUrl ? 'Current photo' : null)
-  const [photoError, setPhotoError]             = useState('')
-  const [receiptDataUrl, setReceiptDataUrl]     = useState<string | null>(equipment.receiptDataUrl)
-  const [receiptName, setReceiptName]           = useState<string | null>(equipment.receiptDataUrl ? 'Current receipt' : null)
-  const [fileError, setFileError]               = useState('')
+
+  // Existing Storage URL (null means no photo / removed)
+  const [photoUrl, setPhotoUrl]         = useState<string | null>(equipment.photoUrl)
+  const [photoFile, setPhotoFile]       = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoName, setPhotoName]       = useState<string | null>(null)
+  const [photoError, setPhotoError]     = useState('')
+
+  const [receiptUrl, setReceiptUrl]         = useState<string | null>(equipment.receiptUrl)
+  const [receiptFile, setReceiptFile]       = useState<File | null>(null)
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
+  const [receiptName, setReceiptName]       = useState<string | null>(null)
+  const [fileError, setFileError]           = useState('')
+
+  const [saving, setSaving] = useState(false)
+
   const photoRef = useRef<HTMLInputElement>(null)
   const fileRef  = useRef<HTMLInputElement>(null)
 
@@ -814,15 +782,19 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
       e.target.value = ''
       return
     }
+    setPhotoFile(file)
     setPhotoName(file.name)
+    setPhotoUrl(null)
     const reader = new FileReader()
-    reader.onload = (ev) => setPhotoDataUrl(ev.target?.result as string)
+    reader.onload = (ev) => setPhotoPreview(ev.target?.result as string)
     reader.readAsDataURL(file)
   }
 
   function removePhoto() {
-    setPhotoDataUrl(null)
+    setPhotoFile(null)
+    setPhotoPreview(null)
     setPhotoName(null)
+    setPhotoUrl(null)
     setPhotoError('')
     if (photoRef.current) photoRef.current.value = ''
   }
@@ -836,42 +808,61 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
       e.target.value = ''
       return
     }
+    setReceiptFile(file)
     setReceiptName(file.name)
+    setReceiptUrl(null)
     const reader = new FileReader()
-    reader.onload = (ev) => setReceiptDataUrl(ev.target?.result as string)
+    reader.onload = (ev) => setReceiptPreview(ev.target?.result as string)
     reader.readAsDataURL(file)
   }
 
   function removeReceipt() {
-    setReceiptDataUrl(null)
+    setReceiptFile(null)
+    setReceiptPreview(null)
     setReceiptName(null)
+    setReceiptUrl(null)
     setFileError('')
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  function handleSave() {
-    onSave({
-      ...equipment,
-      type: equipType,
-      mowerSubType: equipType === 'mower' ? (mowerSubType ?? undefined) : undefined,
-      year: year.trim() || new Date().getFullYear().toString(),
-      make: make.trim(),
-      model: model.trim(),
-      purchaseDate: purchaseDate || null,
-      purchaseLocation: purchaseLocation.trim(),
-      receiptDataUrl,
-      photoDataUrl,
-    })
+  async function handleSave() {
+    if (saving) return
+    setSaving(true)
+    try {
+      await onSave(
+        {
+          ...equipment,
+          type:             equipType,
+          mowerSubType:     equipType === 'mower' ? (mowerSubType ?? undefined) : undefined,
+          year:             year.trim() || new Date().getFullYear().toString(),
+          make:             make.trim(),
+          model:            model.trim(),
+          purchaseDate:     purchaseDate || null,
+          purchaseLocation: purchaseLocation.trim(),
+          photoUrl,
+          receiptUrl,
+        },
+        photoFile,
+        receiptFile,
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
   const canSave = make.trim().length > 0 && model.trim().length > 0
+
+  const showPhoto   = photoFile ? photoPreview   : photoUrl
+  const showReceipt = receiptFile ? receiptPreview : receiptUrl
+  const receiptIsPdf = receiptFile
+    ? receiptFile.type === 'application/pdf'
+    : (receiptUrl?.toLowerCase().includes('.pdf') ?? false)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm flex flex-col max-h-[92vh]">
 
-        {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-base font-bold text-gray-900">Edit Equipment</h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
@@ -879,10 +870,8 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
           </button>
         </div>
 
-        {/* Scrollable form */}
         <div className="overflow-y-auto flex-1 px-5 py-5 space-y-4">
 
-          {/* Equipment type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Equipment Type</label>
             <div className="relative">
@@ -902,7 +891,6 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
             </div>
           </div>
 
-          {/* Mower sub-type */}
           {equipType === 'mower' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Mower Type</label>
@@ -921,7 +909,6 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
             </div>
           )}
 
-          {/* Make + Model */}
           {equipType === 'mower' ? (
             <MowerMakeModelPicker
               make={make}
@@ -946,7 +933,6 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
             </div>
           )}
 
-          {/* Year */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Year</label>
             <input type="number" value={year} min="1990" max={new Date().getFullYear()}
@@ -956,7 +942,6 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
 
           <div className="border-t border-gray-100" />
 
-          {/* Purchase Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Date of Purchase</label>
             <input type="date" value={purchaseDate} max={todayStr()}
@@ -964,7 +949,6 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
           </div>
 
-          {/* Purchase Location */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Purchase Location</label>
             <input type="text" value={purchaseLocation} placeholder="e.g. Home Depot, Dealer Name"
@@ -972,15 +956,14 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent" />
           </div>
 
-          {/* Photo upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Equipment Photo</label>
             <input ref={photoRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
-            {photoDataUrl ? (
+            {showPhoto ? (
               <div className="border border-gray-200 rounded-xl p-3 flex items-center gap-3">
-                <img src={photoDataUrl} alt="Equipment preview" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
+                <img src={showPhoto} alt="Equipment preview" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-700 truncate">{photoName}</p>
+                  <p className="text-sm font-medium text-gray-700 truncate">{photoName ?? 'Current photo'}</p>
                   <button onClick={removePhoto} className="text-xs text-red-500 hover:text-red-600 font-medium">Remove</button>
                 </div>
               </div>
@@ -997,21 +980,20 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
             {photoError && <p className="text-xs text-red-500 mt-1.5">{photoError}</p>}
           </div>
 
-          {/* Receipt upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Receipt</label>
             <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={handleFileChange} className="hidden" />
-            {receiptDataUrl ? (
+            {showReceipt ? (
               <div className="border border-gray-200 rounded-xl p-3 flex items-center gap-3">
-                {receiptDataUrl.startsWith('data:image') ? (
-                  <img src={receiptDataUrl} alt="Receipt preview" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
+                {!receiptIsPdf ? (
+                  <img src={showReceipt} alt="Receipt preview" className="w-12 h-12 object-cover rounded-lg flex-shrink-0" />
                 ) : (
                   <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0 text-gray-400">
                     <ReceiptIcon />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-700 truncate">{receiptName}</p>
+                  <p className="text-sm font-medium text-gray-700 truncate">{receiptName ?? 'Current receipt'}</p>
                   <button onClick={removeReceipt} className="text-xs text-red-500 hover:text-red-600 font-medium">Remove</button>
                 </div>
               </div>
@@ -1029,15 +1011,14 @@ function EditEquipmentModal({ equipment, onClose, onSave }: {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="px-5 pb-5 pt-4 border-t border-gray-100 flex-shrink-0 flex gap-3">
           <button onClick={onClose}
             className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={!canSave}
+          <button onClick={handleSave} disabled={!canSave || saving}
             className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed rounded-xl text-sm font-semibold text-white transition-colors">
-            Save Changes
+            {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
       </div>
@@ -1075,8 +1056,8 @@ function PencilIcon() {
 function EquipmentPhoto({ equipment }: { equipment: Equipment }) {
   const [imgError, setImgError] = useState(false)
 
-  if (equipment.photoDataUrl) {
-    return <img src={equipment.photoDataUrl} alt={`${equipment.make} ${equipment.model}`} className="w-full h-full object-cover" />
+  if (equipment.photoUrl) {
+    return <img src={equipment.photoUrl} alt={`${equipment.make} ${equipment.model}`} className="w-full h-full object-cover" />
   }
 
   const fallbackSrc = equipment.type === 'mower' && equipment.mowerSubType && !imgError
@@ -1100,17 +1081,17 @@ function EquipmentCard({
   onHistoryMaintenance,
   onEdit,
 }: {
-  equipment: Equipment
-  onLogMaintenance: (equipId: string, itemId: string) => void
-  onHistoryMaintenance: (equipId: string, itemId: string) => void
-  onEdit: (equipment: Equipment) => void
+  equipment:           Equipment
+  onLogMaintenance:    (equipId: string, itemId: string) => void
+  onHistoryMaintenance:(equipId: string, itemId: string) => void
+  onEdit:              (equipment: Equipment) => void
 }) {
   const [showReceipt, setShowReceipt] = useState(false)
   const typeLabel = EQUIPMENT_LABELS[equipment.type] ?? 'Equipment'
+  const receiptIsPdf = equipment.receiptUrl?.toLowerCase().includes('.pdf') ?? false
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-      {/* Equipment header */}
       <div className="flex items-start gap-3 mb-4">
         <div className="w-14 h-14 bg-gray-100 rounded-xl flex-shrink-0 mt-0.5 overflow-hidden">
           <EquipmentPhoto equipment={equipment} />
@@ -1145,15 +1126,14 @@ function EquipmentCard({
             Owner&apos;s Manual
           </a>
         </div>
-        {/* Receipt thumbnail */}
-        {equipment.receiptDataUrl && (
+        {equipment.receiptUrl && (
           <button
             onClick={() => setShowReceipt(true)}
             title="View receipt"
             className="flex-shrink-0 w-10 h-10 rounded-xl border border-gray-200 overflow-hidden hover:border-green-400 transition-colors"
           >
-            {equipment.receiptDataUrl.startsWith('data:image') ? (
-              <img src={equipment.receiptDataUrl} alt="Receipt" className="w-full h-full object-cover" />
+            {!receiptIsPdf ? (
+              <img src={equipment.receiptUrl} alt="Receipt" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full bg-gray-50 flex items-center justify-center text-gray-400">
                 <ReceiptIcon />
@@ -1163,7 +1143,6 @@ function EquipmentCard({
         )}
       </div>
 
-      {/* Maintenance items */}
       {equipment.maintenance.length > 0 && (
         <div>
           {equipment.maintenance.map((item) => {
@@ -1196,8 +1175,7 @@ function EquipmentCard({
         </div>
       )}
 
-      {/* Receipt viewer overlay */}
-      {showReceipt && equipment.receiptDataUrl && (
+      {showReceipt && equipment.receiptUrl && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/70"
           onClick={() => setShowReceipt(false)}
@@ -1209,14 +1187,14 @@ function EquipmentCard({
             >
               <CloseIcon />
             </button>
-            {equipment.receiptDataUrl.startsWith('data:image') ? (
-              <img src={equipment.receiptDataUrl} alt="Receipt" className="w-full rounded-2xl shadow-2xl max-h-[80vh] object-contain" />
+            {!receiptIsPdf ? (
+              <img src={equipment.receiptUrl} alt="Receipt" className="w-full rounded-2xl shadow-2xl max-h-[80vh] object-contain" />
             ) : (
               <div className="bg-white rounded-2xl p-6 text-center shadow-2xl">
                 <ReceiptIcon />
                 <p className="text-sm text-gray-600 mt-2 mb-4">PDF receipt</p>
                 <a
-                  href={equipment.receiptDataUrl}
+                  href={equipment.receiptUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm font-semibold text-green-600 hover:text-green-700"
@@ -1237,12 +1215,12 @@ function EquipmentCard({
 function LogModal({
   type, onClose, onSave, date, setDate, duration, setDuration,
 }: {
-  type: ActivityType | null
-  onClose: () => void
-  onSave: () => void
-  date: string
-  setDate: (d: string) => void
-  duration: string
+  type:        ActivityType | null
+  onClose:     () => void
+  onSave:      () => void
+  date:        string
+  setDate:     (d: string) => void
+  duration:    string
   setDuration: (d: string) => void
 }) {
   if (!type) return null
@@ -1281,8 +1259,12 @@ function LogModal({
 function MaintenanceLogModal({
   open, onClose, onSave, date, setDate, itemName,
 }: {
-  open: boolean; onClose: () => void; onSave: () => void
-  date: string; setDate: (d: string) => void; itemName: string
+  open:    boolean
+  onClose: () => void
+  onSave:  () => void
+  date:    string
+  setDate: (d: string) => void
+  itemName:string
 }) {
   if (!open) return null
   return (
@@ -1312,10 +1294,10 @@ export default function Dashboard() {
   const router = useRouter()
 
   const [lawnData, setLawnData]             = useState<LawnData>(DEFAULT_LAWN)
-  const [equipment, setEquipment]           = useState<Equipment[]>(DEFAULT_EQUIPMENT)
+  const [equipment, setEquipment]           = useState<Equipment[]>([])
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([])
   const [photos, setPhotos]                 = useState<LawnPhoto[]>([])
-  const [hydrated, setHydrated]             = useState(false)
+  const [dataLoading, setDataLoading]       = useState(true)
   const [activeTab, setActiveTab]           = useState<'dashboard' | 'photos'>('dashboard')
   const [showAddEquip, setShowAddEquip]     = useState(false)
   const [editEquip, setEditEquip]           = useState<Equipment | null>(null)
@@ -1329,57 +1311,34 @@ export default function Dashboard() {
   const [maintDate, setMaintDate]   = useState(todayStr())
 
   const [historyModal, setHistoryModal] = useState<{
-    title: string; entries: HistoryEntry[]; dotColor: string
+    title:    string
+    entries:  HistoryEntry[]
+    dotColor: string
   } | null>(null)
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login')
-    }
-    if (!authLoading && user && !user.onboardingComplete) {
-      router.push('/onboarding')
-    }
+    if (!authLoading && !user) router.push('/login')
+    if (!authLoading && user && !user.onboardingComplete) router.push('/onboarding')
   }, [user, authLoading, router])
 
-  const lawnKey      = user ? `lawncare-lawn-v2-${user.id}`       : null
-  const equipKey     = user ? `lawncare-equipment-v2-${user.id}`  : null
-  const scheduleKey  = user ? `lawncare-schedule-v1-${user.id}`   : null
-  const photosKey    = user ? `lawncare-photos-v1-${user.id}`     : null
-
   useEffect(() => {
-    if (!lawnKey || !equipKey || !scheduleKey || !photosKey) return
-    try {
-      const savedLawn     = localStorage.getItem(lawnKey)
-      const savedEquip    = localStorage.getItem(equipKey)
-      const savedSchedule = localStorage.getItem(scheduleKey)
-      const savedPhotos   = localStorage.getItem(photosKey)
-      if (savedLawn)     setLawnData(JSON.parse(savedLawn))
-      else               setLawnData(DEFAULT_LAWN)
-      if (savedEquip)    setEquipment(JSON.parse(savedEquip))
-      else               setEquipment(DEFAULT_EQUIPMENT)
-      if (savedSchedule) setScheduledTasks(JSON.parse(savedSchedule))
-      else               setScheduledTasks([])
-      if (savedPhotos)   setPhotos(JSON.parse(savedPhotos))
-      else               setPhotos([])
-    } catch { /* ignore */ }
-    setHydrated(true)
-  }, [lawnKey, equipKey, scheduleKey, photosKey])
-
-  useEffect(() => {
-    if (hydrated && lawnKey)     localStorage.setItem(lawnKey,     JSON.stringify(lawnData))
-  }, [lawnData, hydrated, lawnKey])
-
-  useEffect(() => {
-    if (hydrated && equipKey)    localStorage.setItem(equipKey,    JSON.stringify(equipment))
-  }, [equipment, hydrated, equipKey])
-
-  useEffect(() => {
-    if (hydrated && scheduleKey) localStorage.setItem(scheduleKey, JSON.stringify(scheduledTasks))
-  }, [scheduledTasks, hydrated, scheduleKey])
-
-  useEffect(() => {
-    if (hydrated && photosKey)   localStorage.setItem(photosKey,   JSON.stringify(photos))
-  }, [photos, hydrated, photosKey])
+    if (!user) return
+    setDataLoading(true)
+    Promise.all([
+      db.getLawnData(user.id),
+      db.getEquipment(user.id),
+      db.getScheduledTasks(user.id),
+      db.getLawnPhotos(user.id),
+    ])
+      .then(([lawn, equip, tasks, pics]) => {
+        setLawnData(lawn)
+        setEquipment(equip)
+        setScheduledTasks(tasks)
+        setPhotos(pics)
+      })
+      .catch(console.error)
+      .finally(() => setDataLoading(false))
+  }, [user?.id])
 
   function openActivityModal(type: ActivityType) {
     setLogDate(todayStr())
@@ -1387,14 +1346,25 @@ export default function Dashboard() {
     setActiveModal(type)
   }
 
-  function handleSaveActivity() {
-    if (!activeModal) return
-    const newLog: ActivityLog = { date: logDate }
-    if (activeModal === 'watering') newLog.duration = parseInt(logDuration) || 45
+  async function handleSaveActivity() {
+    if (!activeModal || !user) return
+    const durationMinutes = activeModal === 'watering' ? (parseInt(logDuration) || 45) : undefined
     const nextDate = addDays(logDate, lawnData[activeModal].intervalDays)
+    const newLog = await db.logActivity(
+      user.id,
+      activeModal,
+      logDate,
+      nextDate,
+      lawnData[activeModal].intervalDays,
+      durationMinutes,
+    )
     setLawnData((prev) => ({
       ...prev,
-      [activeModal]: { ...prev[activeModal], logs: [newLog, ...prev[activeModal].logs], nextRecommended: nextDate },
+      [activeModal]: {
+        ...prev[activeModal],
+        logs:            [newLog, ...prev[activeModal].logs],
+        nextRecommended: nextDate,
+      },
     }))
     setActiveModal(null)
   }
@@ -1404,8 +1374,9 @@ export default function Dashboard() {
     setMaintModal({ equipId, itemId })
   }
 
-  function handleSaveMaintenance() {
-    if (!maintModal) return
+  async function handleSaveMaintenance() {
+    if (!maintModal || !user) return
+    await db.logMaintenance(user.id, maintModal.itemId, maintDate)
     setEquipment((prev) =>
       prev.map((e) => e.id !== maintModal.equipId ? e : {
         ...e,
@@ -1417,38 +1388,59 @@ export default function Dashboard() {
     setMaintModal(null)
   }
 
-  function handleAddEquipment(newEquip: Equipment) {
-    setEquipment((prev) => [...prev, newEquip])
+  async function handleAddEquipment(
+    type:        EquipmentType,
+    fields:      Omit<Equipment, 'id' | 'type' | 'maintenance' | 'photoUrl' | 'receiptUrl'>,
+    photoFile:   File | null,
+    receiptFile: File | null,
+  ) {
+    if (!user) return
+    const saved = await db.addEquipment(user.id, type, fields, photoFile, receiptFile)
+    setEquipment((prev) => [...prev, saved])
     setShowAddEquip(false)
   }
 
-  function handleEditEquipment(updated: Equipment) {
-    setEquipment((prev) => prev.map((e) => e.id === updated.id ? updated : e))
+  async function handleEditEquipment(
+    updated:     Equipment,
+    photoFile:   File | null,
+    receiptFile: File | null,
+  ) {
+    if (!user) return
+    const saved = await db.updateEquipment(user.id, updated, photoFile, receiptFile)
+    setEquipment((prev) => prev.map((e) => e.id === saved.id ? saved : e))
     setEditEquip(null)
   }
 
-  function handleAddScheduled(task: Omit<ScheduledTask, 'id'>) {
-    setScheduledTasks((prev) => [...prev, { ...task, id: Date.now().toString() }])
+  async function handleAddScheduled(task: Omit<ScheduledTask, 'id'>) {
+    if (!user) return
+    const saved = await db.addScheduledTask(user.id, task.type, task.date, task.note)
+    setScheduledTasks((prev) => [...prev, saved])
   }
 
-  function handleRemoveScheduled(id: string) {
+  async function handleRemoveScheduled(id: string) {
+    await db.removeScheduledTask(id)
     setScheduledTasks((prev) => prev.filter((t) => t.id !== id))
   }
 
-  function handleAddPhoto(photo: Omit<LawnPhoto, 'id'>) {
-    setPhotos((prev) => [{ ...photo, id: Date.now().toString() }, ...prev])
+  async function handleAddPhoto(file: File, caption: string) {
+    if (!user) return
+    const newPhoto = await db.addLawnPhoto(user.id, file, caption)
+    setPhotos((prev) => [newPhoto, ...prev])
   }
 
-  function handleDeletePhoto(id: string) {
+  async function handleDeletePhoto(id: string) {
+    if (!user) return
+    const photo = photos.find((p) => p.id === id)
+    await db.deleteLawnPhoto(user.id, id, photo?.url ?? '')
     setPhotos((prev) => prev.filter((p) => p.id !== id))
   }
 
   function openActivityHistory(type: ActivityType) {
-    const labels:  Record<ActivityType, string> = { watering: 'Watering History', mowing: 'Mowing History', fertilizing: 'Fertilizing History' }
-    const colors:  Record<ActivityType, string> = { watering: 'bg-blue-500',      mowing: 'bg-green-600',   fertilizing: 'bg-emerald-600'       }
+    const labels: Record<ActivityType, string> = { watering: 'Watering History', mowing: 'Mowing History', fertilizing: 'Fertilizing History' }
+    const colors: Record<ActivityType, string> = { watering: 'bg-blue-500',      mowing: 'bg-green-600',   fertilizing: 'bg-emerald-600'       }
     setHistoryModal({
-      title: labels[type],
-      entries: lawnData[type].logs.map((log) => ({ date: log.date, detail: log.duration ? `Duration: ${log.duration} min` : undefined })),
+      title:    labels[type],
+      entries:  lawnData[type].logs.map((log) => ({ date: log.date, detail: log.duration ? `Duration: ${log.duration} min` : undefined })),
       dotColor: colors[type],
     })
   }
@@ -1463,7 +1455,7 @@ export default function Dashboard() {
     ? equipment.find((e) => e.id === maintModal.equipId)?.maintenance.find((m) => m.id === maintModal.itemId)
     : null
 
-  if (authLoading || !user) {
+  if (authLoading || !user || dataLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-4 border-green-600 border-t-transparent animate-spin" />
@@ -1494,7 +1486,6 @@ export default function Dashboard() {
           <p className="text-green-300 text-sm font-medium">{greeting}</p>
           <h1 className="text-white text-2xl font-bold mt-0.5 mb-6">Your Lawn Dashboard</h1>
 
-          {/* Tab nav */}
           <div className="flex gap-1 bg-white/10 rounded-xl p-1 mb-2">
             {(['dashboard', 'photos'] as const).map((tab) => (
               <button
@@ -1539,12 +1530,10 @@ export default function Dashboard() {
             <CareCard title="Fertilizing" icon={<FertilizeIcon />} activity={lawnData.fertilizing} accentColor="bg-emerald-600" onLog={() => openActivityModal('fertilizing')} onHistory={() => openActivityHistory('fertilizing')} onTip={() => setTipModal('fertilizing')} />
           </div>
 
-          {/* Weather */}
           <div className="mt-6">
             <WeatherWidget zipCode={user.zipCode} />
           </div>
 
-          {/* The Shed */}
           <div className="mt-10">
             <div className="flex items-end justify-between mb-4">
               <div>
@@ -1574,7 +1563,6 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Calendar */}
           <LawnCalendar
             lawnData={lawnData}
             scheduledTasks={scheduledTasks}
@@ -1596,8 +1584,19 @@ export default function Dashboard() {
       )}
 
       {/* Modals */}
-      {showAddEquip && <AddEquipmentModal onClose={() => setShowAddEquip(false)} onSave={handleAddEquipment} />}
-      {editEquip && <EditEquipmentModal equipment={editEquip} onClose={() => setEditEquip(null)} onSave={handleEditEquipment} />}
+      {showAddEquip && (
+        <AddEquipmentModal
+          onClose={() => setShowAddEquip(false)}
+          onSave={handleAddEquipment}
+        />
+      )}
+      {editEquip && (
+        <EditEquipmentModal
+          equipment={editEquip}
+          onClose={() => setEditEquip(null)}
+          onSave={handleEditEquipment}
+        />
+      )}
 
       <LogModal type={activeModal} onClose={() => setActiveModal(null)} onSave={handleSaveActivity}
         date={logDate} setDate={setLogDate} duration={logDuration} setDuration={setLogDuration} />
